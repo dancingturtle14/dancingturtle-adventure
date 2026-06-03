@@ -1,73 +1,199 @@
 /* ============================================
    無限流模擬器 — 核心遊戲引擎
-   多選冒險 · 體力系統 · 物品掉落 · Stat Check
+   AI 預生成副本 · 分支導航 · 世界歷史
    ============================================ */
+
+// ======== 世界定義（副本概念，唔再包含具體場景）=======
+const WORLDS = [
+  {
+    id: 'sleeping_village',
+    name: '沉睡村莊', tier: 'F', type: '探索',
+    minLevel: 1,
+    tags: ['village', 'sleep', 'curse'],
+    description: '一個被奇怪睡意籠罩的偏遠村莊。村民們陷入無法醒來的沉睡...',
+    teHint: '發現並解除村莊下的遠古封印',
+    heHint: '喚醒足夠多的村民',
+    beHint: '被睡意吞噬',
+    color: '#b2bec3',
+  },
+  {
+    id: 'mist_forest', name: '迷霧森林', tier: 'E', type: '解謎',
+    minLevel: 3, tags: ['forest', 'mist', 'ruins'],
+    description: '一片終年被魔法濃霧籠罩的森林。據說森林深處隱藏著古老遺跡...',
+    teHint: '喚醒森林守護者，獲得傳承',
+    heHint: '找到出路逃離森林',
+    beHint: '在迷霧中迷失',
+    color: '#55efc4',
+  },
+  {
+    id: 'forgotten_library', name: '遺忘圖書館', tier: 'D', type: '解謎',
+    minLevel: 5, tags: ['library', 'knowledge', 'void'],
+    description: '一座不在任何地圖上的古老圖書館。書架上的書籍以未知語言書寫...',
+    teHint: '閱讀禁書區的創世記錄',
+    heHint: '找到圖書館的出口',
+    beHint: '被書中知識吞噬意識',
+    color: '#74b9ff',
+  },
+  {
+    id: 'blood_moon_theater', name: '血月劇院', tier: 'C', type: '規則怪談',
+    minLevel: 8, tags: ['theater', 'rules', 'performance'],
+    description: '一座只在血月之夜出現的維多利亞風格劇院。你被分配到一個角色...',
+    teHint: '揭穿劇院本身就是活着的生命體',
+    heHint: '完成整場演出而不違反規則',
+    beHint: '違反劇院規則',
+    color: '#fdcb6e',
+  },
+  {
+    id: 'void_gate', name: '虛空之門', tier: 'B', type: '戰鬥',
+    minLevel: 12, tags: ['void', 'gate', 'cosmic'],
+    description: '一道通往虛空的裂縫出現在現實世界中。你被選中進入其中...',
+    teHint: '封印虛空裂縫，理解虛空的真相',
+    heHint: '擊退虛空生物，關閉裂縫',
+    beHint: '被虛空吞噬',
+    color: '#e17055',
+  },
+  {
+    id: 'abyss_ruins', name: '深淵遺跡', tier: 'A', type: '混合',
+    minLevel: 18, tags: ['abyss', 'ruins', 'ancient'],
+    description: '遠古文明在深淵中建造的最後堡壘。這裡埋藏著無限流世界最深的秘密...',
+    teHint: '解開深淵文明的終極謎題',
+    heHint: '從深淵中帶回關鍵的古代遺物',
+    beHint: '成為深淵的一部分',
+    color: '#ff6b6b',
+  },
+];
+
+// ======== 世界歷史追蹤 ========
+const WorldHistory = {
+  STORAGE_KEY: 'wuxianliu_history',
+
+  _load() {
+    try {
+      return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+    } catch { return {}; }
+  },
+
+  _save(data) {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+  },
+
+  getRecord(worldId) {
+    const all = this._load();
+    return all[worldId] || { entries: [], totalRuns: 0, bestEnding: null };
+  },
+
+  addRun(worldId, runRecord) {
+    const all = this._load();
+    if (!all[worldId]) {
+      all[worldId] = { entries: [], totalRuns: 0, bestEnding: null };
+    }
+    all[worldId].entries.unshift({
+      ...runRecord,
+      date: new Date().toISOString(),
+    });
+    all[worldId].totalRuns++;
+
+    // Track best ending
+    const endingRank = { TE: 3, HE: 2, BE: 1 };
+    if (!all[worldId].bestEnding || endingRank[runRecord.ending] > endingRank[all[worldId].bestEnding]) {
+      all[worldId].bestEnding = runRecord.ending;
+    }
+
+    // Keep last 50 entries per world
+    if (all[worldId].entries.length > 50) {
+      all[worldId].entries = all[worldId].entries.slice(0, 50);
+    }
+
+    this._save(all);
+  },
+
+  getSummary(worldId) {
+    const record = this.getRecord(worldId);
+    return {
+      totalRuns: record.totalRuns,
+      bestEnding: record.bestEnding,
+      recentEntries: record.entries.slice(0, 5),
+    };
+  },
+
+  getAll() {
+    return this._load();
+  },
+
+  syncToSupabase(playerId) {
+    if (!SUPABASE || !playerId) return;
+    const all = this._load();
+    for (const [worldId, data] of Object.entries(all)) {
+      if (data.totalRuns > 0) {
+        SUPABASE.from('world_history').upsert({
+          player_id: playerId,
+          world_id: worldId,
+          entry_count: data.totalRuns,
+          best_ending: data.bestEnding,
+          last_entered_at: data.entries[0]?.date || new Date().toISOString(),
+        }, { onConflict: 'player_id,world_id' });
+      }
+    }
+  }
+};
 
 // ======== 儲存管理 ========
 const Storage = {
   KEY: 'wuxianliu_save',
+  DUNGEON_KEY: 'wuxianliu_dungeon',
 
   save(player) {
-    try {
-      localStorage.setItem(this.KEY, JSON.stringify(player));
-    } catch(e) {
-      console.warn('Save failed:', e);
-    }
+    try { localStorage.setItem(this.KEY, JSON.stringify(player)); } catch {}
   },
 
   load() {
     try {
       const raw = localStorage.getItem(this.KEY);
       return raw ? JSON.parse(raw) : null;
-    } catch(e) {
-      console.warn('Load failed:', e);
-      return null;
-    }
+    } catch { return null; }
   },
 
-  getGuestPlayer() {
-    return createDefaultPlayer('夜鴞', '🦉');
+  saveDungeon(dungeon) {
+    try { localStorage.setItem(this.DUNGEON_KEY, JSON.stringify(dungeon)); } catch {}
   },
 
-  clear() {
-    localStorage.removeItem(this.KEY);
-  }
+  loadDungeon() {
+    try {
+      const raw = localStorage.getItem(this.DUNGEON_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+
+  clearDungeon() {
+    localStorage.removeItem(this.DUNGEON_KEY);
+  },
+
+  getGuestPlayer() { return createDefaultPlayer('夜鴞', '🦉'); },
+  clear() { localStorage.removeItem(this.KEY); }
 };
 
 // ======== 體力系統 ========
 const StaminaSystem = {
   getAvailable(player) {
     const elapsed = (Date.now() - player.lastRecharge) / 1000;
-    const recharged = Math.min(
-      player.maxStamina - player.stamina,
-      Math.floor(elapsed / RECHARGE_SECONDS)
-    );
+    const recharged = Math.min(player.maxStamina - player.stamina, Math.floor(elapsed / RECHARGE_SECONDS));
     return player.stamina + recharged;
   },
-
-  canRun(player) {
-    return this.getAvailable(player) >= STAMINA_PER_RUN || player.dailyRunsLeft > 0;
-  },
-
+  canRun(player) { return this.getAvailable(player) >= STAMINA_PER_RUN || player.dailyRunsLeft > 0; },
   spend(player) {
-    if (player.dailyRunsLeft > 0) {
-      player.dailyRunsLeft--;
-      return true;
-    }
+    if (player.dailyRunsLeft > 0) { player.dailyRunsLeft--; return true; }
     const available = this.getAvailable(player);
     if (available < STAMINA_PER_RUN) return false;
-    const remaining = available - STAMINA_PER_RUN;
-    player.stamina = remaining;
+    player.stamina = available - STAMINA_PER_RUN;
     player.lastRecharge = Date.now();
     return true;
   },
-
   checkDailyReset(player) {
     const today = new Date().toISOString().split('T')[0];
     if (player.lastDailyReset !== today) {
       player.dailyRunsLeft = FREE_RUNS_PER_DAY;
       player.lastDailyReset = today;
-      return true; // reset happened
+      return true;
     }
     return false;
   }
@@ -78,418 +204,452 @@ function skillCheck(statName, playerStats, dc) {
   const bonus = playerStats[statName] || 0;
   const roll = Math.floor(Math.random() * 20) + 1;
   const total = roll + bonus;
-  return {
-    success: total >= dc,
-    roll,
-    bonus,
-    total,
-    dc,
-    margin: total - dc,
-    natural20: roll === 20,
-    natural1: roll === 1,
-    statName,
-  };
+  return { success: total >= dc, roll, bonus, total, dc, margin: total - dc, natural20: roll === 20, natural1: roll === 1, statName };
 }
 
-// ======== 場景對話系統 (Demo mode - 無 AI 時用) ========
-const DemoScenes = {
-  // 根據 dungeon + scene number 生成
-  generate(dungeon, sceneNum) {
-    const scenes = this._templates[dungeon.id];
-    if (!scenes) return this._fallback();
-    const idx = sceneNum % scenes.length;
-    return scenes[idx];
-  },
+// ======== AI 副本生成器 ========
+const DungeonGen = {
+  _seedCounter: 0,
 
-  _fallback() {
-    return {
-      narrative: '你踏入了一個未知的區域。四周充滿了詭異的寂靜，空氣中飄浮著微光。你能感覺到某種存在正在觀察你。',
-      choices: [
-        { id: 1, text: '仔細觀察四周的環境', stat: 'insight', dc: 8, type: 'exploration' },
-        { id: 2, text: '大聲呼叫，看看會發生什麼', stat: null, dc: null, type: 'story', safe: true },
-        { id: 3, text: '尋找隱藏的路徑或線索', stat: 'puzzle', dc: 10, type: 'puzzle' },
-        { id: 4, text: '跟隨直覺隨機前行', stat: 'luck', dc: 6, type: 'gambling' },
-      ]
-    };
-  },
+  // AI 生成完整副本樹
+  async generate(world, player) {
+    this._seedCounter++;
 
-  _templates: {
-    'sleeping_village': [
-      {
-        narrative: '你走進沉睡村莊。街道上散落著停擺的雜物——翻倒的攤車、未收的衣服、半杯涼透的茶。所有村民都維持著倒下前一刻的姿勢，均勻地呼吸著。村中央的水井散發著淡淡的藍綠色光芒。',
-        choices: [
-          { id: 1, text: '檢查水井中的發光來源', stat: 'insight', dc: 8, type: 'exploration' },
-          { id: 2, text: '嘗試喚醒一個村民', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '搜索村長的屋子尋找線索', stat: 'puzzle', dc: 10, type: 'puzzle' },
-          { id: 4, text: '握住那發光的井水喝一口', stat: 'luck', dc: 6, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '村中各處都發現了相同的符號——一個由三個螺旋組成的圖案，刻在門框、井邊、甚至村民的手背上。這些螺旋似乎正以極慢的速度轉動。圖書館的門虛掩著。',
-        choices: [
-          { id: 1, text: '調查圖書館中的古籍', stat: 'insight', dc: 10, type: 'exploration' },
-          { id: 2, text: '沿著螺旋符號最多的路走', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '嘗試繪製反轉的螺旋來破解', stat: 'puzzle', dc: 12, type: 'puzzle' },
-          { id: 4, text: '用刀刮掉村民手上的符號', stat: 'luck', dc: 8, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '地下傳來低沉的心跳聲。村莊下方似乎有一個巨大的空洞——而那個空洞正在呼吸。水源從地下被吸取，經過螺旋符號的轉化，散發到整個村莊的空氣中。',
-        choices: [
-          { id: 1, text: '尋找通往地下的入口', stat: 'insight', dc: 12, type: 'exploration' },
-          { id: 2, text: '打破水井，讓藍色氣體散去', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '佈置防禦陣法再下去', stat: 'puzzle', dc: 14, type: 'puzzle' },
-          { id: 4, text: '直接跳入水井中的光芒', stat: 'luck', dc: 10, type: 'gambling' },
-        ]
-      },
-    ],
-    'forgotten_library': [
-      {
-        narrative: '你站在遺忘圖書館的大廳中。書架延伸到視線盡頭，高得看不見天花板。空中飄浮著發光的文字，像螢火蟲一樣緩慢移動。地板上刻著一行字——「知識即為鑰匙」。',
-        choices: [
-          { id: 1, text: '仔細觀察那些發光的文字', stat: 'insight', dc: 8, type: 'exploration' },
-          { id: 2, text: '沿著書架之間的小徑探索', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '試著解讀地板上的字', stat: 'puzzle', dc: 10, type: 'puzzle' },
-          { id: 4, text: '隨手翻開一本離你最近的書', stat: 'luck', dc: 6, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '你來到一個圓形大廳，七根蠟燭燃燒著，但只有六個燭台。第七根蠟燭——飄浮在半空。地上有新鮮的腳印，似乎不久前有人經過。',
-        choices: [
-          { id: 1, text: '跟隨那些腳印', stat: 'insight', dc: 10, type: 'exploration' },
-          { id: 2, text: '檢查飄浮的蠟燭', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '排列蠟燭的順序來解謎', stat: 'puzzle', dc: 12, type: 'puzzle' },
-          { id: 4, text: '吹熄所有蠟燭', stat: 'luck', dc: 8, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '禁書區的大門就在前方，被三道鎖保護著。鎖上分別刻著：過去、現在、未來。每一道鎖都需要回答一個關於世界本質的問題。錯誤的答案會觸發圖書館的防禦機制。',
-        choices: [
-          { id: 1, text: '仔細研究鎖上的銘文尋找提示', stat: 'insight', dc: 12, type: 'exploration' },
-          { id: 2, text: '勇敢地回答問題，接受挑戰', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '用圖書館中的知識推斷答案', stat: 'puzzle', dc: 14, type: 'puzzle' },
-          { id: 4, text: '嘗試用蠻力破壞三道鎖', stat: 'combat', dc: 16, type: 'combat' },
-        ]
-      },
-    ],
-    'blood_moon_theater': [
-      {
-        narrative: '血月劇院的大門在午夜自動打開。你被一股無形的力量推入大廳。牆上貼著一張發光的節目單，上面寫著你的名字——以及你今晚的角色：「最後的觀眾」。',
-        choices: [
-          { id: 1, text: '仔細閱讀節目單的所有規則', stat: 'insight', dc: 10, type: 'exploration' },
-          { id: 2, text: '按照指引走向觀眾席', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '尋找節目單上沒寫的隱藏規則', stat: 'puzzle', dc: 12, type: 'puzzle' },
-          { id: 4, text: '嘗試轉身離開劇院', stat: 'luck', dc: 8, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '舞台上的演出開始了。演員們戴著白色面具，表演著一場關於背叛的默劇。你注意到其中一位演員的手勢——他在重複向你發出警告。節目的第三幕即將開始。',
-        choices: [
-          { id: 1, text: '解讀演員的手勢警告', stat: 'insight', dc: 12, type: 'exploration' },
-          { id: 2, text: '按照劇本繼續觀看演出', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '記錄所有演員的出場規律', stat: 'puzzle', dc: 14, type: 'puzzle' },
-          { id: 4, text: '衝上舞台搶走演員的面具', stat: 'combat', dc: 14, type: 'combat' },
-        ]
-      },
-    ],
-    'void_gate': [
-      {
-        narrative: '虛空之門在你面前敞開——一道由純粹黑暗組成的裂縫，懸浮在半空中。從裂縫中傳來低沉的耳語，像是在召喚你。周圍的一切都在緩慢地被裂縫吸引。',
-        choices: [
-          { id: 1, text: '觀察裂縫中的虛空結構', stat: 'insight', dc: 12, type: 'exploration' },
-          { id: 2, text: '穩住身形，不讓自己被吸入', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '佈置封印陣法關閉裂縫', stat: 'puzzle', dc: 16, type: 'puzzle' },
-          { id: 4, text: '直接踏入虛空中探索', stat: 'luck', dc: 12, type: 'gambling' },
-        ]
-      },
-      {
-        narrative: '虛空中沒有上下左右之分。你飄浮在一片漆黑中，只有遠處的星光作為參考。一團巨大的陰影在你面前凝聚——虛空之主的化身正在形成。',
-        choices: [
-          { id: 1, text: '尋找虛空中的弱點', stat: 'insight', dc: 14, type: 'exploration' },
-          { id: 2, text: '嘗試與虛空之主溝通', stat: null, dc: null, type: 'story', safe: true },
-          { id: 3, text: '準備戰鬥，正面對抗', stat: 'combat', dc: 16, type: 'combat' },
-          { id: 4, text: '用你擁有的道具尋找機會', stat: 'luck', dc: 14, type: 'gambling' },
-        ]
-      },
-    ],
-  },
-
-  // 根據選擇產生結果
-  processChoice(dungeon, sceneNum, choiceId, player) {
-    const scenes = this._templates[dungeon.id];
-    if (!scenes) return this._fallbackResult(player);
-
-    const idx = sceneNum % scenes.length;
-    const scene = scenes[idx];
-    const choice = scene.choices.find(c => c.id === choiceId);
-    if (!choice) return this._fallbackResult(player);
-
-    let success = true;
-    let checkResult = null;
-    if (choice.stat) {
-      checkResult = skillCheck(choice.stat, player.stats, choice.dc);
-      success = checkResult.success;
+    // 如果有 AI key，用 AI 生成
+    if (AIGM && AIGM.apiKey) {
+      try {
+        const result = await AIGM.generateDungeonTree(world, player, this._seedCounter);
+        if (result) {
+          Storage.saveDungeon(result);
+          return result;
+        }
+      } catch(e) {
+        console.warn('AI dungeon generation failed, using template:', e.message);
+      }
     }
 
-    // 生成結果描述
-    const resultText = success
-      ? this._successText(choice, checkResult)
-      : this._failText(choice, checkResult);
-
-    // 經驗值
-    const baseXP = 15 + sceneNum * 5;
-    const xpGained = success ? baseXP : Math.floor(baseXP * 0.3);
-
-    // 物品掉落
-    const itemDrop = rollLoot();
-
-    return {
-      narrative: resultText,
-      success,
-      checkResult,
-      xpGained,
-      itemDrop,
-      sceneEnd: sceneNum >= 2, // after 3 scenes, the dungeon ends
-    };
+    // Fallback：用示範副本
+    return this._templateFallback(world, player);
   },
 
-  _successText(choice, check) {
-    const texts = {
-      exploration: [
-        '你的觀察力發揮了作用！你發現了一個被忽略的細節——牆角有一道幾乎看不見的縫隙。',
-        '你敏銳的感知讓你捕捉到了一閃而過的線索。這個發現將會在後續派上用場。',
-        '透過仔細觀察，你注意到環境中的圖案暗藏玄機——它們拼湊成一份地圖。',
-      ],
-      puzzle: [
-        '你的推理能力讓你破解了眼前的謎題！機關發出咔嚓聲，一道隱藏的門打開了。',
-        '你成功解讀了那些符號的含義——它們是一段過去文明的文字，記錄著重要信息。',
-        '邏輯鏈條在你的腦中連成。你找到了破解這個困境的關鍵。',
-      ],
-      combat: [
-        '你展現了出色的戰鬥技巧！雖然付出了一些代價，但你成功擊退了威脅。',
-        '你的戰鬥本能讓你預判了對手的動作。一擊得手！',
-        '武力不是唯一的解決方式，但至少現在你有了說話的籌碼。',
-      ],
-      gambling: [
-        '你的直覺從未讓你失望。這次也不例外——你誤打誤撞找到了正確的方向。',
-        '運氣站在你這邊！一個隨機的選擇帶來了意想不到的好結果。',
-        '冒險的行動獲得了回報。有時候，勇氣比計劃更重要。',
-      ],
-      story: [
-        '你選擇了跟隨內心的指引。有時候，最簡單的選擇會帶來最意想不到的收穫。',
-        '你的行動引起了這個世界的共鳴。你感到某種力量在關注著你。',
-        '平靜的選擇往往能讓你發現被忽略的美好。你在這個過程中獲得了一些新的領悟。',
-      ],
+  // 示範副本（無 AI 時用）
+  _templateFallback(world, player) {
+    const dungeon = {
+      instanceId: `demo_${Date.now()}`,
+      worldId: world.id,
+      worldName: world.name,
+      worldTier: world.tier,
+      seed: this._seedCounter,
+      background: world.description,
+      playerStatsAtEntry: { ...player.stats },
+      playerLevel: player.level,
+      branches: {},
+      endings: [],
+      currentBranch: 'start',
+      pathTaken: [],
+      completed: false,
+      finalEnding: null,
+      generatedAt: new Date().toISOString(),
     };
 
-    const pool = texts[choice.type] || texts.story;
-    return pool[Math.floor(Math.random() * pool.length)] +
-      (check ? `\n\n🎲 骰子：${check.roll} + ${check.bonus}(${check.statName}) = ${check.total} ≥ ${check.dc} ✅` : '');
-  },
-
-  _failText(choice, check) {
-    const texts = {
-      exploration: [
-        '你努力觀察，但周圍的環境太過隱晦。你錯過了關鍵的線索——至少暫時如此。',
-        '光線太暗，你的視線模糊不清。什麼也沒發現。',
-      ],
-      puzzle: [
-        '這個謎題超出了你目前的理解範圍。你感到一陣挫折——或許你需要更多信息。',
-        '你的推理走進了死胡同。那些符號的含義仍然是一個謎。',
-      ],
-      combat: [
-        '你的攻擊被輕易化解了！對方的實力遠超你的預期。你被迫後退，尋找新的機會。',
-        '戰鬥對你來說太過艱難。你受了點輕傷，但勉強逃脫了。',
-      ],
-      gambling: [
-        '這次你的運氣不好。冒險的行動帶來了反效果——你損失了一些時間和精力。',
-        '運氣不是永遠可靠的。這次你賭錯了。',
-      ],
-      story: [
-        '這個選擇似乎沒有帶來預期的效果。但至少你沒有因此陷入危險。',
-        '世界沒有因為你的行動而改變。也許你需要更大膽一些。',
-      ],
-    };
-
-    const pool = texts[choice.type] || texts.story;
-    return pool[Math.floor(Math.random() * pool.length)] +
-      (check ? `\n\n🎲 骰子：${check.roll} + ${check.bonus}(${check.statName}) = ${check.total} < ${check.dc} ❌` : '');
-  },
-
-  _fallbackResult(player) {
-    return {
-      narrative: '你完成了這個場景的探索，準備迎接下一個挑戰。',
-      success: true,
-      checkResult: null,
-      xpGained: 10,
-      itemDrop: null,
-      sceneEnd: false,
-    };
-  },
-
-  // 最終場景結果
-  finale(dungeon, outcomes, player) {
-    const successes = outcomes.filter(o => o.success).length;
-    const totalScenes = outcomes.length;
-
-    // 判斷結局
-    let ending;
-    if (successes === totalScenes) {
-      ending = { type: 'TE', label: '✦ True End', desc: dungeon.teCondition || '完美通關！', xpBonus: 300 };
-    } else if (successes >= Math.ceil(totalScenes / 2)) {
-      ending = { type: 'HE', label: '✅ Normal End', desc: dungeon.heCondition || '通關成功', xpBonus: 150 };
+    // 每個世界有 3 條主路線 + 隱藏路線
+    const branchDefs = BRANCH_TEMPLATES[world.id];
+    if (branchDefs) {
+      dungeon.branches = this._deepClone(branchDefs);
+      dungeon.endings = BRANCH_ENDINGS[world.id] || [];
     } else {
-      ending = { type: 'BE', label: '💀 Bad End', desc: dungeon.beCondition || '冒險失敗', xpBonus: 30 };
+      // Generic fallback
+      dungeon.branches = this._genericBranches();
+      dungeon.endings = this._genericEndings();
     }
 
-    return ending;
+    // Adapt DCs to player level
+    this._adaptDCs(dungeon, player);
+
+    Storage.saveDungeon(dungeon);
+    return dungeon;
+  },
+
+  _adaptDCs(dungeon, player) {
+    for (const branch of Object.values(dungeon.branches)) {
+      if (branch.choices) {
+        for (const choice of branch.choices) {
+          if (choice.requires?.dc) {
+            // Scale DC to be challenging but achievable
+            const statValue = player.stats[choice.requires.stat] || 5;
+            choice.requires.dc = Math.max(5, Math.min(20, statValue + Math.floor(Math.random() * 6) + 2));
+          }
+        }
+      }
+    }
+  },
+
+  _deepClone(obj) { return JSON.parse(JSON.stringify(obj)); },
+
+  _genericBranches() {
+    return {
+      'start': {
+        id: 'start', title: '入口', description: '你踏入了未知的領域。四周充滿了詭異的寂靜。',
+        choices: [
+          { id: 'c1', text: '仔細觀察四周', requires: { stat: 'insight', dc: 8 }, leadsTo: 'b_explore',
+            encounter: { type: 'exploration', difficulty: 'easy', winRate: 0.7, xpReward: 20, itemPool: ['herb'], itemDropChance: 0.3 } },
+          { id: 'c2', text: '勇敢向前走', requires: null, leadsTo: 'b_story',
+            encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 15, itemPool: [], itemDropChance: 0 } },
+          { id: 'c3', text: '尋找隱藏路徑 [解謎 10]', requires: { stat: 'puzzle', dc: 10 }, leadsTo: 'b_puzzle',
+            encounter: { type: 'puzzle', difficulty: 'medium', winRate: 0.6, xpReward: 25, itemPool: ['old_key'], itemDropChance: 0.35 } },
+          { id: 'c4', text: '跟隨直覺走 [運氣 6]', requires: { stat: 'luck', dc: 6 }, leadsTo: 'b_luck',
+            encounter: { type: 'gambling', difficulty: 'variable', winRate: 0.5, xpReward: 30, itemPool: ['bone_charm'], itemDropChance: 0.4 } },
+        ]
+      },
+      'b_explore': { id: 'b_explore', title: '探索之路', description: '你發現了一些有趣的線索...',
+        choices: [{ id: 'c5', text: '繼續深入', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'exploration', difficulty: 'medium', winRate: 0.8, xpReward: 25, itemPool: ['moon_pendant'], itemDropChance: 0.3 } }] },
+      'b_story': { id: 'b_story', title: '命運之路', description: '你遇到了一個神秘的人物...',
+        choices: [{ id: 'c6', text: '與他對話', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 20, itemPool: ['cloth_armor'], itemDropChance: 0.25 } }] },
+      'b_puzzle': { id: 'b_puzzle', title: '解謎之路', description: '一個古老的機關擋住了你的去路。',
+        choices: [{ id: 'c7', text: '嘗試破解機關', requires: null, leadsTo: 'end_te',
+          encounter: { type: 'puzzle', difficulty: 'hard', winRate: 0.5, xpReward: 35, itemPool: ['enigma_ring'], itemDropChance: 0.4 } }] },
+      'b_luck': { id: 'b_luck', title: '機緣之路', description: '你誤打誤撞來到了一個隱藏區域...',
+        choices: [{ id: 'c8', text: '探索這個區域', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'gambling', difficulty: 'easy', winRate: 0.6, xpReward: 22, itemPool: ['bone_charm'], itemDropChance: 0.3 } }] },
+      'end_be': { id: 'end_be', title: '💀 終點', description: '你被周圍的黑暗吞噬...', choices: [], isEnd: true },
+      'end_he': { id: 'end_he', title: '出口', description: '你看到了出口的光亮！', choices: [], isEnd: true },
+      'end_te': { id: 'end_te', title: '✦ 真相', description: '你發現了這個世界的核心秘密！', choices: [], isEnd: true },
+    };
+  },
+
+  _genericEndings() {
+    return [
+      { type: 'TE', label: '✦ True End', condition: '發現核心秘密', pathPattern: 'start→b_puzzle→end_te', xpBonus: 300 },
+      { type: 'HE', label: '✅ Normal End', condition: '找到出口', pathPattern: 'start→*→end_he', xpBonus: 150 },
+      { type: 'BE', label: '💀 Bad End', condition: '被吞噬', pathPattern: 'start→*→end_be', xpBonus: 30 },
+    ];
   }
 };
 
-// ======== 當前遊戲狀態 ========
+// ======== 示範分支模板 ========
+const BRANCH_TEMPLATES = {
+  'sleeping_village': {
+    'start': {
+      id: 'start', title: '村莊入口', description: '你走進沉睡村莊。街道上散落著停擺的雜物——翻倒的攤車、未收的衣服、半杯涼透的茶。所有村民都沉睡著。村中央的水井散發著淡淡的藍綠色光芒。',
+      choices: [
+        { id: 'c1', text: '檢查水井中的發光來源 [洞察 8]', requires: { stat: 'insight', dc: 8 }, leadsTo: 'b_explore',
+          encounter: { type: 'exploration', difficulty: 'easy', winRate: 0.75, xpReward: 20, itemPool: ['moon_pendant', 'herb'], itemDropChance: 0.3 } },
+        { id: 'c2', text: '嘗試喚醒一個村民', requires: null, leadsTo: 'b_awaken',
+          encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 15, itemPool: ['cloth_armor'], itemDropChance: 0.2 } },
+        { id: 'c3', text: '搜索村長的屋子 [解謎 10]', requires: { stat: 'puzzle', dc: 10 }, leadsTo: 'b_clue',
+          encounter: { type: 'puzzle', difficulty: 'medium', winRate: 0.6, xpReward: 25, itemPool: ['old_key', 'ancient_compass'], itemDropChance: 0.35 } },
+        { id: 'c4', text: '喝一口發光的井水 [運氣 6]', requires: { stat: 'luck', dc: 6 }, leadsTo: 'b_vision',
+          encounter: { type: 'gambling', difficulty: 'variable', winRate: 0.5, xpReward: 30, itemPool: ['bone_charm'], itemDropChance: 0.4 } },
+      ]
+    },
+    'b_explore': {
+      id: 'b_explore', title: '井底之謎', description: '你俯身看向水井深處。藍綠色光芒來自井底的一個古老封印——三個螺旋組成的圖案正緩慢轉動。封印上刻著一行小字：「萬物歸一」。',
+      choices: [
+        { id: 'c5', text: '試圖解除封印 [解謎 12]', requires: { stat: 'puzzle', dc: 12 }, leadsTo: 'end_te',
+          encounter: { type: 'puzzle', difficulty: 'hard', winRate: 0.5, xpReward: 35, itemPool: ['star_fragment'], itemDropChance: 0.35 } },
+        { id: 'c6', text: '尋找更多關於封印的信息', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'exploration', difficulty: 'medium', winRate: 0.7, xpReward: 22, itemPool: ['ancient_compass'], itemDropChance: 0.3 } },
+      ]
+    },
+    'b_awaken': {
+      id: 'b_awaken', title: '甦醒嘗試', description: '你搖晃一個村民的肩膀。他的眼皮顫動了一下，但沒有醒來。你注意到所有村民的手背上都刻著相同的螺旋符號。',
+      choices: [
+        { id: 'c7', text: '清除村民手上的符號', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 18, itemPool: ['herb', 'cloth_armor'], itemDropChance: 0.2 } },
+        { id: 'c8', text: '研究符號的意義 [洞察 10]', requires: { stat: 'insight', dc: 10 }, leadsTo: 'b_explore',
+          encounter: { type: 'exploration', difficulty: 'easy', winRate: 0.75, xpReward: 20, itemPool: ['old_key'], itemDropChance: 0.25 } },
+      ]
+    },
+    'b_clue': {
+      id: 'b_clue', title: '村長書房', description: '村長的書桌上有一本翻開的日記。最後一頁寫著：「封印在井底，解法在星光中。農曆十五月圓之夜，三個螺旋重合之時，封印最弱。」',
+      choices: [
+        { id: 'c9', text: '帶上日記去水井', requires: null, leadsTo: 'end_te',
+          encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 25, itemPool: ['star_fragment'], itemDropChance: 0.3 } },
+        { id: 'c10', text: '搜索書房暗格 [解謎 8]', requires: { stat: 'puzzle', dc: 8 }, leadsTo: 'end_he',
+          encounter: { type: 'puzzle', difficulty: 'easy', winRate: 0.8, xpReward: 20, itemPool: ['silver_dagger'], itemDropChance: 0.3 } },
+      ]
+    },
+    'b_vision': {
+      id: 'b_vision', title: '幻象', description: '井水的力量讓你看到了幻象——村莊地下深處有一座遠古祭壇，祭壇上放著一個打開的盒子。盒子中空無一物，但周圍環繞著強大的能量。',
+      choices: [
+        { id: 'c11', text: '跟隨幻象中的路去找祭壇', requires: null, leadsTo: 'end_te',
+          encounter: { type: 'gambling', difficulty: 'hard', winRate: 0.5, xpReward: 35, itemPool: ['void_blade'], itemDropChance: 0.3 } },
+        { id: 'c12', text: '幻象太危險，回到現實', requires: null, leadsTo: 'end_he',
+          encounter: { type: 'gambling', difficulty: 'easy', winRate: 0.8, xpReward: 18, itemPool: ['luck_charm'], itemDropChance: 0.2 } },
+      ]
+    },
+    'end_be': { id: 'end_be', title: '💀 吞噬', description: '睡意如潮水般湧來。你無法抵抗...陷入永恆的沉睡。', choices: [], isEnd: true },
+    'end_he': { id: 'end_he', title: '✅ 曙光', description: '你成功喚醒了村民們！雖然封印仍在，但村莊恢復了生機。', choices: [], isEnd: true },
+    'end_te': { id: 'end_te', title: '✦ 解放', description: '你解除了井底的遠古封印！村庄真正自由了——而你也獲得了一份特殊的力量。', choices: [], isEnd: true },
+  },
+  'forgotten_library': {
+    'start': {
+      id: 'start', title: '圖書館大廳', description: '書架延伸到視線盡頭，高得看不見天花板。空中飄浮著發光的文字，地板上刻著：「知識即為鑰匙」。',
+      choices: [
+        { id: 'c1', text: '觀察發光的文字 [洞察 8]', requires: { stat: 'insight', dc: 8 }, leadsTo: 'b_explore',
+          encounter: { type: 'exploration', difficulty: 'easy', winRate: 0.7, xpReward: 20, itemPool: ['moon_pendant'], itemDropChance: 0.3 } },
+        { id: 'c2', text: '沿書架之間探索', requires: null, leadsTo: 'b_story',
+          encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 15, itemPool: ['herb'], itemDropChance: 0.2 } },
+        { id: 'c3', text: '解讀地板文字 [解謎 10]', requires: { stat: 'puzzle', dc: 10 }, leadsTo: 'b_puzzle',
+          encounter: { type: 'puzzle', difficulty: 'medium', winRate: 0.6, xpReward: 25, itemPool: ['enigma_ring'], itemDropChance: 0.35 } },
+        { id: 'c4', text: '隨手翻開一本書 [運氣 6]', requires: { stat: 'luck', dc: 6 }, leadsTo: 'b_luck',
+          encounter: { type: 'gambling', difficulty: 'variable', winRate: 0.5, xpReward: 30, itemPool: ['bone_charm'], itemDropChance: 0.4 } },
+      ]
+    },
+    'b_explore': { id: 'b_explore', title: '發光文字', description: '那些文字組成了一份古老的地圖。你看到圖書館的結構——中央大廳地下還有一層。', choices: [
+      { id: 'c5', text: '前往地下層', requires: null, leadsTo: 'end_te',
+        encounter: { type: 'exploration', difficulty: 'hard', winRate: 0.55, xpReward: 40, itemPool: ['time_hourglass', 'book_of_fate'], itemDropChance: 0.35 } },
+      { id: 'c6', text: '繼續在地面探索', requires: null, leadsTo: 'end_he',
+        encounter: { type: 'exploration', difficulty: 'medium', winRate: 0.7, xpReward: 20, itemPool: ['silver_dagger'], itemDropChance: 0.3 } },
+    ]},
+    'b_story': { id: 'b_story', title: '書架之間', description: '你在一個書架上發現了一本空白的書——但當你觸碰它時，文字開始浮現。', choices: [
+      { id: 'c7', text: '閱讀浮現的文字', requires: null, leadsTo: 'end_te',
+        encounter: { type: 'story', difficulty: 'none', winRate: 1.0, xpReward: 25, itemPool: ['book_of_fate'], itemDropChance: 0.25 } },
+    ]},
+    'b_puzzle': { id: 'b_puzzle', title: '文字謎題', description: '地板上的文字是一個謎題。七根蠟燭燃燒著，但只有六個燭台。', choices: [
+      { id: 'c8', text: '排列蠟燭順序', requires: null, leadsTo: 'end_te',
+        encounter: { type: 'puzzle', difficulty: 'hard', winRate: 0.5, xpReward: 35, itemPool: ['time_hourglass'], itemDropChance: 0.35 } },
+    ]},
+    'b_luck': { id: 'b_luck', title: '隨機之書', description: '你翻開的書頁中掉出一張書籤——上面寫著通往禁書區的密碼。', choices: [
+      { id: 'c9', text: '用密碼去禁書區', requires: null, leadsTo: 'end_te',
+        encounter: { type: 'gambling', difficulty: 'medium', winRate: 0.6, xpReward: 35, itemPool: ['star_fragment'], itemDropChance: 0.3 } },
+    ]},
+    'end_be': { id: 'end_be', title: '💀 迷失', description: '圖書館的知識洪流淹沒了你的意識。你迷失在無盡的書架中。', choices: [], isEnd: true },
+    'end_he': { id: 'end_he', title: '✅ 離開', description: '你找到了圖書館的出口。雖然未能探索所有秘密，但帶回了一些珍貴的知識。', choices: [], isEnd: true },
+    'end_te': { id: 'end_te', title: '✦ 真相', description: '你閱讀了禁書區的創世記錄。世界的真相遠比你想像的更加宏大...你獲得了命運之書的認可。', choices: [], isEnd: true },
+  },
+};
+
+// ======== 結局模板 ========
+const BRANCH_ENDINGS = {
+  'sleeping_village': [
+    { type: 'TE', label: '✦ True End', condition: '解除封印', pathPattern: 'start→(b_explore|b_vision|b_clue)→end_te', xpBonus: 300 },
+    { type: 'HE', label: '✅ Normal End', condition: '喚醒村民', pathPattern: 'start→*→end_he', xpBonus: 150 },
+    { type: 'BE', label: '💀 Bad End', condition: '被睡意吞噬', pathPattern: 'start→*→end_be', xpBonus: 30 },
+  ],
+  'forgotten_library': [
+    { type: 'TE', label: '✦ True End', condition: '閱讀創世記錄', pathPattern: 'start→(b_explore|b_puzzle|b_luck|b_story)→end_te', xpBonus: 300 },
+    { type: 'HE', label: '✅ Normal End', condition: '找到出口', pathPattern: 'start→*→end_he', xpBonus: 150 },
+    { type: 'BE', label: '💀 Bad End', condition: '迷失知識洪流', pathPattern: 'start→*→end_be', xpBonus: 30 },
+  ],
+};
+
+// ======== 遊戲狀態 ========
 const Game = {
   player: null,
-  currentDungeon: null,
-  currentScene: null,
-  sceneNumber: 0,
-  outcomes: [],
+  currentDungeon: null,  // AI-generated dungeon tree
+  currentBranch: null,   // current branch node
   isProcessing: false,
 
   init() {
     this.loadPlayer();
-
-    // Check daily reset
     StaminaSystem.checkDailyReset(this.player);
     this.save();
   },
 
-  loadPlayer() {
-    this.player = Storage.load() || Storage.getGuestPlayer();
+  loadPlayer() { this.player = Storage.load() || Storage.getGuestPlayer(); },
+  save() { Storage.save(this.player); },
+
+  // 檢查世界歷史
+  getWorldHistory(worldId) {
+    return WorldHistory.getSummary(worldId);
   },
 
-  save() {
-    Storage.save(this.player);
+  getAllWorldHistory() {
+    return WorldHistory.getAll();
   },
 
-  startRun(dungeonId) {
-    if (this.isProcessing) return false;
-
-    const dungeon = DUNGEONS.find(d => d.id === dungeonId);
-    if (!dungeon) return false;
-
-    // Check stamina
-    if (!StaminaSystem.canRun(this.player)) return false;
-
-    // Spend stamina
-    StaminaSystem.spend(this.player);
-
-    // Initialize run
-    this.currentDungeon = dungeon;
-    this.currentScene = null;
-    this.sceneNumber = 0;
-    this.outcomes = [];
-    this.isProcessing = false;
-    this.save();
-
-    return true;
-  },
-
-  getCurrentScene() {
-    return DemoScenes.generate(this.currentDungeon, this.sceneNumber);
-  },
-
-  makeChoice(choiceId) {
-    if (this.isProcessing || !this.currentDungeon) return null;
+  // 開始冒險：AI 預生成完整副本
+  async startRun(worldId) {
+    if (this.isProcessing) return null;
     this.isProcessing = true;
 
-    const result = DemoScenes.processChoice(
-      this.currentDungeon,
-      this.sceneNumber,
-      choiceId,
-      this.player
-    );
+    const world = WORLDS.find(w => w.id === worldId);
+    if (!world) { this.isProcessing = false; return null; }
 
-    this.outcomes.push(result);
-    this.sceneNumber++;
+    if (!StaminaSystem.canRun(this.player)) { this.isProcessing = false; return null; }
 
-    // Apply XP
-    this.player.exp += result.xpGained;
-    const newLevel = calcLevel(this.player.exp);
-    if (newLevel > this.player.level) {
-      this.player.level = newLevel;
-    }
-
-    // Apply item drop
-    if (result.itemDrop) {
-      this.player.items.push(result.itemDrop);
-    }
-
-    // Check if run ends
-    const isEnd = result.sceneEnd || this.sceneNumber >= 3;
-    if (isEnd) {
-      const ending = DemoScenes.finale(this.currentDungeon, this.outcomes, this.player);
-      result.ending = ending;
-      result.isEnd = true;
-
-      // Update player stats for ending
-      if (ending.type === 'TE') this.player.teCount++;
-      else if (ending.type === 'HE') this.player.heCount++;
-      else this.player.beCount++;
-
-      this.player.completedRuns++;
-      this.player.exp += ending.xpBonus;
-
-      // Divine alert
-      if (result.itemDrop && result.itemDrop.rarity === 'divine') {
-        this.player.divineFound = true;
-      }
-
-      // Level check again after bonus XP
-      const finalLevel = calcLevel(this.player.exp);
-      if (finalLevel > this.player.level) {
-        this.player.level = finalLevel;
-      }
-
-      // Reset dungeon state
-      this.currentDungeon = null;
-      this.currentScene = null;
-      this.sceneNumber = 0;
-      this.outcomes = [];
-    }
-
+    // 扣體力
+    StaminaSystem.spend(this.player);
     this.save();
+
+    // AI 生成副本樹
+    const dungeon = await DungeonGen.generate(world, this.player);
+    this.currentDungeon = dungeon;
+    this.currentBranch = dungeon.branches['start'];
+
     this.isProcessing = false;
-    return result;
+    return dungeon;
+  },
+
+  // 獲取當前分支
+  getCurrentBranch() {
+    return this.currentBranch;
+  },
+
+  // 選擇一個選項
+  makeChoice(choiceId) {
+    if (!this.currentDungeon || !this.currentBranch) return null;
+
+    const choice = this.currentBranch.choices?.find(c => c.id === choiceId);
+    if (!choice) return null;
+
+    // 檢查 stat 需求
+    if (choice.requires) {
+      const check = skillCheck(choice.requires.stat, this.player.stats, choice.requires.dc);
+      if (!check.success) {
+        // Failed check — still proceed but with disadvantage
+        return this._resolveChoice(choice, false);
+      }
+    }
+
+    return this._resolveChoice(choice, true);
+  },
+
+  _resolveChoice(choice, statPassed) {
+    const enc = choice.encounter;
+    const result = this._rollEncounter(enc, statPassed);
+
+    // 記錄路徑
+    this.currentDungeon.pathTaken.push(choice.id);
+    this.currentDungeon.currentBranch = choice.leadsTo;
+
+    // 獲取下一個分支
+    const nextBranch = this.currentDungeon.branches[choice.leadsTo];
+    const isEnd = nextBranch?.isEnd || false;
+
+    // Apply rewards
+    if (result.success) {
+      this.player.exp += result.xpGained;
+      const newLevel = calcLevel(this.player.exp);
+      if (newLevel > this.player.level) this.player.level = newLevel;
+
+      // 物品掉落
+      if (result.item) {
+        this.player.items.push(result.item);
+      }
+    }
+
+    let ending = null;
+    if (isEnd) {
+      ending = this._determineEnding(choice.leadsTo);
+      if (ending) {
+        this.currentDungeon.finalEnding = ending.type;
+        this.player.exp += ending.xpBonus;
+        const newLevel = calcLevel(this.player.exp);
+        if (newLevel > this.player.level) this.player.level = newLevel;
+
+        if (ending.type === 'TE') this.player.teCount++;
+        else if (ending.type === 'HE') this.player.heCount++;
+        else this.player.beCount++;
+        this.player.completedRuns++;
+
+        // 世界歷史記錄
+        WorldHistory.addRun(this.currentDungeon.worldId, {
+          ending: ending.type,
+          xpGained: result.xpGained + (ending.xpBonus || 0),
+          items: result.item ? [result.item.name] : [],
+          path: [...this.currentDungeon.pathTaken],
+        });
+
+        // Sync to Supabase if connected
+        if (typeof SupaDB !== 'undefined' && SupaDB.ready()) {
+          this._syncRunToSupabase(ending, result);
+        }
+      }
+    }
+
+    this.currentBranch = nextBranch;
+    if (isEnd) {
+      this.currentDungeon.completed = true;
+      Storage.clearDungeon();
+    } else {
+      Storage.saveDungeon(this.currentDungeon);
+    }
+    this.save();
+
+    return { result, nextBranch, isEnd, ending, choice, statPassed };
+  },
+
+  _rollEncounter(enc, statPassed) {
+    const roll = Math.random();
+    const winRate = statPassed ? enc.winRate : enc.winRate * 0.5;
+    const success = roll < winRate || enc.difficulty === 'none';
+
+    const xpGained = success ? enc.xpReward : Math.floor(enc.xpReward * 0.3);
+
+    // Roll for item drop
+    let item = null;
+    if (success && enc.itemPool?.length > 0 && Math.random() < enc.itemDropChance) {
+      const templateId = enc.itemPool[Math.floor(Math.random() * enc.itemPool.length)];
+      const template = ITEM_TEMPLATES[templateId];
+      if (template) {
+        item = createItemInstance(templateId);
+        if (item && SUPABASE) {
+          SupaDB.saveItem(item);
+        }
+      }
+    }
+
+    return { success, xpGained, item, roll, winRate };
+  },
+
+  _determineEnding(branchId) {
+    const endings = this.currentDungeon.endings;
+    // Match from highest priority
+    const te = endings.find(e => e.pathPattern.includes(branchId) && e.type === 'TE');
+    if (te && this.currentDungeon.pathTaken.some(p => te.pathPattern.includes(p))) return te;
+    const he = endings.find(e => e.pathPattern.includes(branchId) && e.type === 'HE');
+    if (he) return he;
+    const be = endings.find(e => e.pathPattern.includes(branchId) && e.type === 'BE');
+    return be || endings[endings.length - 1];
+  },
+
+  _syncRunToSupabase(ending, result) {
+    if (!SUPABASE || !this.player?.id) return;
+    SUPABASE.from('runs').insert({
+      player_id: this.player.id,
+      dungeon_world_id: this.currentDungeon.worldId,
+      ending_type: ending.type,
+      xp_gained: result.xpGained + (ending.xpBonus || 0),
+      items_gained: result.item ? [result.item.templateId] : [],
+      path_taken: this.currentDungeon.pathTaken,
+      completed_at: new Date().toISOString(),
+    }).then(() => {
+      WorldHistory.syncToSupabase(this.player.id);
+    }).catch(() => {});
+  },
+
+  // 繼續未完成的冒險
+  resumeRun() {
+    const dungeon = Storage.loadDungeon();
+    if (dungeon && !dungeon.completed) {
+      this.currentDungeon = dungeon;
+      this.currentBranch = dungeon.branches[dungeon.currentBranch];
+      return dungeon;
+    }
+    return null;
   },
 
   getStaminaDisplay() {
     const available = StaminaSystem.getAvailable(this.player);
-    return {
-      current: available,
-      max: this.player.maxStamina,
-      dailyLeft: this.player.dailyRunsLeft,
-      canRun: StaminaSystem.canRun(this.player),
-    };
+    return { current: available, max: this.player.maxStamina, dailyLeft: this.player.dailyRunsLeft, canRun: StaminaSystem.canRun(this.player) };
   },
 
-  getAvailableDungeons() {
-    return DUNGEONS.filter(d => this.player.level >= d.minLevel);
+  getAvailableWorlds() {
+    return WORLDS.filter(w => this.player.level >= w.minLevel);
   },
 
   sellItem(instanceId) {
     const idx = this.player.items.findIndex(i => i.instanceId === instanceId);
     if (idx === -1) return false;
-
     const item = this.player.items[idx];
-    const price = Math.floor((item.sellPrice || 0) * (0.2 + Math.random() * 0.1)); // 20-30%
+    const price = Math.floor((item.sellPrice || 0) * (0.2 + Math.random() * 0.1));
     this.player.currency += price;
     this.player.items.splice(idx, 1);
     this.save();
     return { price, itemName: item.name };
   },
-
-  // 物品轉移（交易用）
-  transferItem(fromPlayer, toPlayer, instanceId) {
-    // 呢個 function 之後會用於 Supabase 版本
-  }
 };

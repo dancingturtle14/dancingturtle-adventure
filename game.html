@@ -50,20 +50,26 @@
       <!-- Dungeon Select (shown when not in a run) -->
       <div id="dungeon-select" class="dungeon-select-panel">
         <div class="dungeon-header-section">
-          <h1>⚔️ 選擇副本</h1>
+          <h1>⚔️ 選擇世界</h1>
           <p style="color:var(--text-light);font-size:14px;margin-top:4px">
             每次冒險消耗 <strong>20</strong> 體力 ｜ 每日免費 <strong>5</strong> 次
           </p>
         </div>
 
         <div id="dungeon-list" class="dungeon-grid">
-          <!-- Dungeons rendered by JS -->
+          <!-- Worlds rendered by JS -->
         </div>
 
-        <div class="run-summary" id="run-summary" style="display:none">
-          <h3>📋 上次冒險回顧</h3>
-          <div id="last-run-detail"></div>
+        <!-- World History -->
+        <div id="world-history" style="display:none">
+          <!-- World history panel -->
         </div>
+      </div>
+
+      <!-- Loading Area (shown while AI generates dungeon) -->
+      <div id="loading-area" class="loading-panel" style="display:none">
+        <div class="loading-spinner">🌀</div>
+        <div class="loading-text">AI 正在生成副本...</div>
       </div>
 
       <!-- Adventure Area (shown during a run) -->

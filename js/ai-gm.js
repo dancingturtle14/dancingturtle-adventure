@@ -311,3 +311,137 @@ Type 只可以是：exploration, combat, puzzle, story, gambling 之一。`;
 
 // Auto-load saved key
 AIGM.loadApiKey();
+
+/**
+ * Generate a complete dungeon tree (all branches, encounters, drops)
+ */
+AIGM.generateDungeonTree = async function(world, player, seed) {
+  if (!this.apiKey) return null;
+
+  const systemPrompt = `你是一個「無限流模擬器」的 AI GM，負責設計完整的副本結構。
+
+【世界觀】
+- 玩家被選中進入無限流世界，必須穿越不同副本
+- 每個副本是一個獨立世界，有自己的規則和故事
+- 副本有 F(最簡單) 到 A(極難) 的分級
+- 每個副本有三種結局：BE(壞), HE(正常通關), TE(完美)
+
+【當前副本】
+名稱：${world.name}
+難度：${world.tier}級（${world.type}）
+描述：${world.description}
+
+【玩家資訊】
+等級：Lv.${player.level}
+屬性：洞察 ${player.stats.insight}, 生存 ${player.stats.survival}, 戰鬥 ${player.stats.combat}, 解謎 ${player.stats.puzzle}, 運氣 ${player.stats.luck}
+
+【設計要求——至關重要】
+1. 生成一個完整的副本分支樹，包含以下部分：
+   a. background: 3-5句場景背景描述
+   b. branches: 包含至少 6 個分支節點（start + 4個中間節點 + 3個結局節點）
+   c. endings: 3種結局定義
+
+2. 每個分支節點包含：
+   - id: 唯一標識
+   - title: 節點名稱
+   - description: 2-3句場景描述（繁體中文）
+   - choices: 2-3個選項（最後的分支可只有1個）
+
+3. 每個選項包含：
+   - id: 唯一標識
+   - text: 選項文字（繁體中文）
+   - requires: stat需求（其中一個為 null 安全選項），stat只可以是 insight/survival/combat/puzzle/luck
+   - leadsTo: 下一個分支 ID
+   - encounter: 包含 type, difficulty(easy/medium/hard), winRate(0-1，按玩家屬性調整), xpReward(15-50), itemPool(2-4個道具ID), itemDropChance(0.1-0.5)
+
+4. 道具 ID 從以下選擇：iron_sword, cloth_armor, herb, old_key, bone_charm, steel_sword, leather_armor, torch, moon_pendant, silver_dagger, void_blade, enigma_ring, phantom_cloak, ancient_compass, soul_reaper, time_hourglass, star_fragment, book_of_fate, eternal_dawn
+   更難的區域用更高稀有度的道具。
+
+5. 結局節點 id 必須是 end_be / end_he / end_te 其中之一。
+
+6. 輸出必須是純 JSON，不要任何 markdown 或註釋。
+
+【輸出格式】
+{
+  "instanceId": "ai_${seed}_${Date.now()}",
+  "worldId": "${world.id}",
+  "worldName": "${world.name}",
+  "worldTier": "${world.tier}",
+  "seed": ${seed},
+  "background": "背景描述...",
+  "branches": {
+    "start": { "id": "start", "title": "...", "description": "...", "choices": [...] },
+    "branch_1": { "id": "branch_1", "title": "...", "description": "...", "choices": [...] },
+    "end_be": { "id": "end_be", "title": "💀 結局", "description": "...", "choices": [], "isEnd": true },
+    "end_he": { "id": "end_he", "title": "✅ 結局", "description": "...", "choices": [], "isEnd": true },
+    "end_te": { "id": "end_te", "title": "✦ 結局", "description": "...", "choices": [], "isEnd": true }
+  },
+  "endings": [
+    { "type": "TE", "label": "✦ True End", "condition": "...", "pathPattern": "...", "xpBonus": 300 },
+    { "type": "HE", "label": "✅ Normal End", "condition": "...", "pathPattern": "...", "xpBonus": 150 },
+    { "type": "BE", "label": "💀 Bad End", "condition": "...", "pathPattern": "...", "xpBonus": 30 }
+  ],
+  "currentBranch": "start",
+  "pathTaken": [],
+  "completed": false,
+  "finalEnding": null,
+  "generatedAt": "${new Date().toISOString()}"
+}`;
+
+  try {
+    const response = await fetch(this.apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+        'HTTP-Referer': 'https://dancingturtle.github.io',
+        'X-Title': 'DancingTurtle 無限流模擬器',
+      },
+      body: JSON.stringify({
+        model: this.settings.model,
+        messages: [{ role: 'system', content: systemPrompt }],
+        temperature: 0.85,
+        max_tokens: 3000,
+        response_format: { type: 'json_object' },
+      })
+    });
+
+    if (!response.ok) throw new Error(`API ${response.status}`);
+
+    const data = await response.json();
+    const tree = JSON.parse(data.choices[0].message.content);
+
+    // Validate and fix structure
+    if (!tree.branches || !tree.endings) throw new Error('Invalid tree structure');
+
+    // Ensure end nodes exist
+    for (const e of ['end_be', 'end_he', 'end_te']) {
+      if (!tree.branches[e]) {
+        tree.branches[e] = { id: e, title: '結局', description: '你的旅程在此結束。', choices: [], isEnd: true };
+      }
+    }
+
+    // Ensure start node exists
+    if (!tree.branches['start']) throw new Error('Missing start node');
+
+    // Ensure 1 safe choice per branch
+    for (const branch of Object.values(tree.branches)) {
+      if (branch.choices && branch.choices.length > 0) {
+        const hasSafe = branch.choices.some(c => !c.requires);
+        if (!hasSafe) {
+          branch.choices[branch.choices.length - 1].requires = null;
+        }
+      }
+    }
+
+    tree.playerStatsAtEntry = { ...player.stats };
+    tree.playerLevel = player.level;
+    tree.currentBranch = 'start';
+    tree.pathTaken = [];
+
+    return tree;
+  } catch (e) {
+    console.warn('AI generateDungeonTree failed:', e.message);
+    return null;
+  }
+};

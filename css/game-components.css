@@ -1083,3 +1083,235 @@
   color: white;
   transform: rotate(30deg);
 }
+
+/* ======== LOADING PANEL ======== */
+.loading-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  font-size: 64px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.loading-sub {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* ======== WORLD HISTORY ======== */
+.world-history-panel {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: var(--shadow-lg);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.wh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+}
+
+.wh-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.wh-title h2 {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.wh-stats {
+  text-align: right;
+}
+
+.wh-stat {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 4px;
+}
+
+.wh-stat strong {
+  font-size: 18px;
+  color: var(--text);
+}
+
+.wh-entries {
+  margin-bottom: 20px;
+}
+
+.wh-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.wh-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.wh-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.wh-actions .btn {
+  flex: 1;
+}
+
+/* ======== DUNGEON HISTORY BADGE ======== */
+.dungeon-history {
+  margin-bottom: 10px;
+}
+
+.history-badge {
+  font-size: 11px;
+  background: var(--bg-card-alt);
+  padding: 2px 10px;
+  border-radius: 10px;
+  color: var(--text-light);
+}
+
+.history-badge.new {
+  color: var(--secondary);
+  background: rgba(0,184,148,0.1);
+}
+
+/* ======== BRANCH TITLE ======== */
+.branch-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary-light);
+  color: var(--primary);
+}
+
+/* ======== CHOICE DIFFICULTY ======== */
+.choice-diff {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.choice-diff.easy { background: rgba(0,184,148,0.12); color: var(--secondary); }
+.choice-diff.medium { background: rgba(253,203,110,0.2); color: #b8860b; }
+.choice-diff.hard { background: rgba(255,107,107,0.12); color: var(--danger); }
+
+/* ======== ENCOUNTER RESULT ======== */
+.encounter-result {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+.encounter-result.success {
+  background: rgba(0,184,148,0.1);
+  color: var(--secondary);
+}
+
+.encounter-result.fail {
+  background: rgba(255,107,107,0.1);
+  color: var(--danger);
+}
+
+.roll-detail {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+.outcome-text {
+  line-height: 1.7;
+  font-size: 14px;
+  color: var(--text-light);
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--bg-card-alt);
+  border-radius: var(--radius-sm);
+}
+
+/* ======== ENDING DISPLAY ======== */
+.ending-display {
+  text-align: center;
+  padding: 24px;
+  border: 2px solid;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.ending-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.ending-label {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.ending-condition {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+
+.ending-xp {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* ======== ITEM DROP IN RESULT ======== */
+.item-drop-card {
+  padding: 12px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(255,193,7,0.06), rgba(255,152,0,0.06));
+  margin: 12px 0;
+}
