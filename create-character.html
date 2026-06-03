@@ -127,7 +127,28 @@
   </div>
 
   <script src="js/data.js"></script>
+  <script src="js/supabase-config.js"></script>
   <script>
+    // Wait for Supabase
+    let _supaReady = false;
+    (async function() {
+      await loadScript('https://unpkg.com/@supabase/supabase-js@2');
+      window._supabase = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+      SUPABASE = window._supabase;
+      _supaReady = true;
+    })();
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
     let points = 20;
     const stats = { insight: 5, survival: 5, combat: 5, puzzle: 5, luck: 5 };
     const maxPerStat = 15;
@@ -178,6 +199,8 @@
     renderStats();
 
     function saveAndEnter() {
+      if (!_supaReady) { alert('系統加載中，請稍候...'); return; }
+
       // Get character name
       const nameInput = document.querySelector('.form-group:first-child input');
       const charName = nameInput?.value?.trim() || '夜鴞';
@@ -186,24 +209,33 @@
       const selectedAvatar = document.querySelector('.avatar-option.selected');
       const avatar = selectedAvatar?.textContent || '🦉';
 
-      // Save player to localStorage
-      const player = createDefaultPlayer(charName, avatar);
-      player.stats = { ...stats };
-      player.level = 1;
-      player.exp = 0;
-      player.currency = 0;
-      player.stamina = MAX_STAMINA;
-      player.dailyRunsLeft = FREE_RUNS_PER_DAY;
-      player.lastDailyReset = new Date().toISOString().split('T')[0];
-      player.completedRuns = 0;
-      player.items = [];
+      // Save to Supabase
+      (async () => {
+        const session = await SUPABASE.auth.getSession();
+        if (!session?.data?.session) {
+          alert('請先登入！');
+          window.location.href = 'index.html';
+          return;
+        }
 
-      // Clear old save
-      localStorage.removeItem('wuxianliu_save');
-      Storage.save(player);
+        const { error } = await SUPABASE.from('players').update({
+          username: charName,
+          avatar: avatar,
+          stats: { ...stats },
+          stat_points: 0,
+          stamina_current: 100,
+          daily_runs_used: 0,
+          last_daily_reset: new Date().toISOString().split('T')[0],
+        }).eq('auth_id', session.data.session.user.id);
 
-      // Navigate
-      location.href = 'lobby.html';
+        if (error) {
+          alert('儲存失敗：' + error.message);
+          return;
+        }
+
+        console.log('✅ Character created:', charName);
+        window.location.href = 'lobby.html';
+      })();
     }
   </script>
 </body>

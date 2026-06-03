@@ -313,5 +313,16 @@ const GameUI = {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => GameUI.init());
 } else {
-  GameUI.init();
+  // Wait for Supabase player data
+  if (Game.player?.username) {
+    GameUI.init();
+  } else {
+    document.addEventListener('playerReady', () => GameUI.init());
+    setTimeout(() => {
+      if (!Game.player?.username) {
+        alert('請先登入！');
+        window.location.href = 'index.html';
+      }
+    }, 5000);
+  }
 }

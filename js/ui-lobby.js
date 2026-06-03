@@ -114,11 +114,11 @@ const LobbyUI = {
       });
     }
 
-    // Load chat history from localStorage
-    this.loadChatHistory();
+    // Load chat from Supabase
+    this.loadChatFromServer();
   },
 
-  sendChat() {
+  async sendChat() {
     const input = document.getElementById('chat-input');
     if (!input) return;
     const text = input.value.trim();
@@ -127,8 +127,21 @@ const LobbyUI = {
     input.value = '';
 
     const p = Game.player;
+    // Add locally immediately
     this.addChatMessage(p.username, text, p.avatar);
-    this.saveChatMessage(p.username, text, p.avatar);
+    // Send to server
+    await ChatAPI.send(p.username, p.avatar, text);
+  },
+
+  async loadChatFromServer() {
+    try {
+      const messages = await ChatAPI.getMessages(50);
+      messages.forEach(msg => {
+        this.addChatMessage(msg.username, msg.message, msg.avatar);
+      });
+    } catch(e) {
+      console.warn('Chat load failed:', e.message);
+    }
   },
 
   addChatMessage(username, text, avatar) {
@@ -188,8 +201,14 @@ const LobbyUI = {
 };
 
 // ======== Init ========
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => LobbyUI.init());
-} else {
+document.addEventListener('playerReady', () => {
   LobbyUI.init();
-}
+});
+
+// Fallback: if playerReady never fires (no Supabase session), show login link
+setTimeout(() => {
+  if (!Game.player?.username) {
+    alert('請先登入！');
+    window.location.href = 'index.html';
+  }
+}, 5000);

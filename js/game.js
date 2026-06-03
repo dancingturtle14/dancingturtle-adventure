@@ -105,6 +105,12 @@ const WorldHistory = {
     }
 
     this._save(all);
+
+    // Also save to Supabase if available
+    if (SUPABASE && Game.player?.id) {
+      WorldHistoryAPI.upsert(worldId, all[worldId].totalRuns, all[worldId].bestEnding);
+      RunAPI.save(worldId, runRecord.ending, runRecord.xpGained || 0, runRecord.items || [], runRecord.path || []);
+    }
   },
 
   getSummary(worldId) {
