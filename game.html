@@ -47,23 +47,48 @@
 
     <!-- Main Content -->
     <div class="game-content">
-      <!-- Dungeon Select (shown when not in a run) -->
+      <!-- Dungeon Select (single reincarnation button) -->
       <div id="dungeon-select" class="dungeon-select-panel">
-        <div class="dungeon-header-section">
-          <h1>⚔️ 選擇世界</h1>
-          <p style="color:var(--text-light);font-size:14px;margin-top:4px">
-            每次冒險消耗 <strong>20</strong> 體力 ｜ 每日免費 <strong>5</strong> 次
+        <div class="reincarnation-hero">
+          <div class="reincarnation-icon">🌀</div>
+          <h1>✦ 無限輪迴</h1>
+          <p class="reincarnation-sub">
+            每次進入輪迴，AI 會根據你的實力、裝備和經歷，<br>
+            為你建構一條獨一無二的冒險之路。
           </p>
+
+          <div class="reincarnation-info">
+            <div class="rinfo-item">
+              <span class="rinfo-label">體力</span>
+              <span class="rinfo-value">⚡ <span id="stamina-display">100</span>/100</span>
+            </div>
+            <div class="rinfo-item">
+              <span class="rinfo-label">今日免費</span>
+              <span class="rinfo-value">🎫 <span id="daily-display">5</span>次</span>
+            </div>
+            <div class="rinfo-item">
+              <span class="rinfo-label">資金</span>
+              <span class="rinfo-value">💰 <span id="currency-display">0</span></span>
+            </div>
+            <div class="rinfo-item">
+              <span class="rinfo-label">屬性點</span>
+              <span class="rinfo-value">⬆️ <span id="statpoints-display">0</span></span>
+            </div>
+          </div>
+
+          <button class="reincarnation-btn" id="reincarnation-btn" onclick="GameUI.enterReincarnation()">
+            <span class="rbtn-icon">🌀</span>
+            <span class="rbtn-text">進入輪迴</span>
+            <span class="rbtn-sub">消耗 20 體力</span>
+          </button>
+
+          <div class="reincarnation-history" id="reincarnation-history">
+            <!-- Last run summary shown here -->
+          </div>
         </div>
 
-        <div id="dungeon-list" class="dungeon-grid">
-          <!-- Worlds rendered by JS -->
-        </div>
-
-        <!-- World History -->
-        <div id="world-history" style="display:none">
-          <!-- World history panel -->
-        </div>
+        <!-- World History panel (shown when a run finishes) -->
+        <div id="world-history" style="display:none"></div>
       </div>
 
       <!-- Loading Area (shown while AI generates dungeon) -->

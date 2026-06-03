@@ -324,6 +324,7 @@ function createDefaultPlayer(username = '冒險者', avatar = '🦉') {
     dailyRunsLeft: FREE_RUNS_PER_DAY,
     lastDailyReset: new Date().toISOString().split('T')[0],
     stats: { insight: 5, survival: 5, combat: 5, puzzle: 5, luck: 5 },
+    statPoints: 0,  // earned from leveling up
     items: [],
     completedRuns: 0,
     teCount: 0,

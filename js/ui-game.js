@@ -1,5 +1,5 @@
 /* ============================================
-   無限流模擬器 — 冒險 UI（AI 生成副本版）
+   無限流模擬器 — 冒險 UI（進入輪迴版）
    ============================================ */
 
 const GameUI = {
@@ -10,141 +10,110 @@ const GameUI = {
     const resumed = Game.resumeRun();
     if (resumed) {
       this.resumeAdventure(resumed);
-    } else {
-      this.renderWorldList();
     }
 
-    this.updateHUD();
+    this.updateDisplay();
   },
 
-  updateHUD() {
+  updateDisplay() {
     const stamina = Game.getStaminaDisplay();
-    setText('stamina-val', Math.floor(stamina.current));
-    setText('daily-val', stamina.dailyLeft);
-    setText('currency-val', Game.player.currency);
+    setText('stamina-display', Math.floor(stamina.current));
+    setText('daily-display', stamina.dailyLeft);
+    setText('currency-display', Game.player.currency);
+    setText('statpoints-display', Game.player.statPoints);
     setText('avatar-display', Game.player.avatar);
     setText('mobile-avatar', Game.player.avatar);
     setText('mobile-name', `${Game.player.username} · Lv.`);
     setText('mobile-level', Game.player.level);
     setText('mobile-exp', `EXP: ${Game.player.exp}`);
     setText('mobile-stamina', Math.floor(stamina.current));
+
+    // Update button state
+    const btn = document.getElementById('reincarnation-btn');
+    if (btn) {
+      btn.disabled = !stamina.canRun;
+      btn.style.opacity = stamina.canRun ? '1' : '0.5';
+    }
+
+    // Show recent history
+    this.showRecentHistory();
   },
 
-  // ======== 世界選擇（含歷史記錄）=======
-  renderWorldList() {
-    const container = document.getElementById('dungeon-list');
+  showRecentHistory() {
+    const container = document.getElementById('reincarnation-history');
     if (!container) return;
 
-    show('dungeon-select');
-    hide('adventure-area');
-    hide('loading-area');
-    hide('world-history');
-
-    const available = Game.getAvailableWorlds();
-    const stamina = Game.getStaminaDisplay();
     const allHistory = Game.getAllWorldHistory();
+    const recent = [];
 
-    container.innerHTML = available.map(w => {
-      const isLocked = Game.player.level < w.minLevel || !stamina.canRun;
-      const history = allHistory[w.id];
-      const totalRuns = history?.totalRuns || 0;
-      const bestEnding = history?.bestEnding || null;
-      const bestEmoji = { TE: '⭐', HE: '✅', BE: '💀' };
+    for (const [worldId, data] of Object.entries(allHistory)) {
+      if (data.entries && data.entries.length > 0) {
+        const latest = data.entries[0];
+        const world = WORLDS.find(w => w.id === worldId);
+        recent.push({ worldId, worldName: world?.name || worldId, ...latest });
+      }
+    }
 
-      return `
-        <div class="dungeon-card ${isLocked ? 'locked' : ''}" data-world="${w.id}">
-          <div class="dungeon-card-header">
-            <span class="dungeon-tier" style="background:${w.color}">${w.tier}</span>
-            <span class="dungeon-name">${w.name}</span>
-            <span class="dungeon-type">${w.type}</span>
-          </div>
-          <div class="dungeon-desc">${w.description}</div>
-          <div class="dungeon-history">
-            ${totalRuns > 0 ? `<span class="history-badge">🕐 ${totalRuns}次 ${bestEmoji[bestEnding]||''}</span>` : '<span class="history-badge new">🆕 未探索</span>'}
-          </div>
-          <div class="dungeon-footer">
-            <span class="dungeon-req">🔒 Lv.${w.minLevel}+</span>
-            ${isLocked
-              ? `<span class="dungeon-locked-msg">${Game.player.level < w.minLevel ? '等級不足' : '體力不足'}</span>`
-              : `<button class="btn btn-primary dungeon-enter-btn" onclick="GameUI.showWorldHistory('${w.id}')">✦ 進入</button>`
-            }
-          </div>
-        </div>
-      `;
-    }).join('');
-  },
+    recent.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  showWorldHistory(worldId) {
-    const world = WORLDS.find(w => w.id === worldId);
-    if (!world) return;
+    if (recent.length === 0) {
+      container.innerHTML = `<div class="rh-empty">尚未進入過輪迴。準備好迎接未知了嗎？</div>`;
+      return;
+    }
 
-    const history = Game.getWorldHistory(worldId);
-    const container = document.getElementById('world-history');
-    if (!container) return;
-
-    show('world-history');
-    const endingEmoji = { TE: '✦', HE: '✅', BE: '💀' };
-    const endingColor = { TE: 'var(--gold)', HE: 'var(--secondary)', BE: 'var(--danger)' };
+    const colors = { TE: 'var(--gold)', HE: 'var(--secondary)', BE: 'var(--danger)' };
+    const icons = { TE: '✦', HE: '✅', BE: '💀' };
 
     container.innerHTML = `
-      <div class="world-history-panel">
-        <div class="wh-header">
-          <div class="wh-title">
-            <span style="font-size:24px">🌍</span>
-            <div>
-              <h2>${world.name}</h2>
-              <span class="dungeon-tier" style="background:${world.color}">${world.tier}</span>
-              <span class="dungeon-type">${world.type}</span>
-            </div>
-          </div>
-          <div class="wh-stats">
-            <div class="wh-stat"><strong>${history.totalRuns}</strong> 次進入</div>
-            <div class="wh-stat"><strong>${history.bestEnding ? endingEmoji[history.bestEnding] : '—'}</strong> 最佳</div>
-          </div>
+      <div class="rh-title">📜 最近輪迴</div>
+      ${recent.slice(0, 5).map(r => `
+        <div class="rh-entry">
+          <span class="rh-ending" style="color:${colors[r.ending]}">${icons[r.ending]}</span>
+          <span class="rh-world">${r.worldName}</span>
+          <span class="rh-xp">✨+${r.xpGained} EXP</span>
+          ${r.items?.length ? `<span class="rh-items">${r.items.join(', ')}</span>` : ''}
+          <span class="rh-date">${new Date(r.date).toLocaleDateString('zh-HK')}</span>
         </div>
-
-        ${history.recentEntries.length > 0 ? `
-          <div class="wh-entries">
-            <h3 style="font-size:14px;margin-bottom:8px">📜 冒險記錄</h3>
-            ${history.recentEntries.map(e => `
-              <div class="wh-entry">
-                <span style="color:${endingColor[e.ending]};font-weight:700">${endingEmoji[e.ending]}</span>
-                <span style="flex:1">${e.items.length > 0 ? `獲得 ${e.items.join(', ')}` : '未獲得物品'}</span>
-                <span style="font-size:11px;color:var(--text-muted)">${new Date(e.date).toLocaleDateString('zh-HK')}</span>
-              </div>
-            `).join('')}
-          </div>
-        ` : `<div class="wh-empty">🆕 從未進入過這個世界。準備好迎接未知了嗎？</div>`}
-
-        <div class="wh-actions">
-          <button class="btn btn-secondary" onclick="GameUI.renderWorldList()">← 返回</button>
-          <button class="btn btn-primary" onclick="GameUI.startDungeon('${worldId}')">✦ 進入【${world.name}】</button>
-        </div>
-      </div>
+      `).join('')}
     `;
   },
 
-  // ======== AI 生成副本 + 進入 ========
-  async startDungeon(worldId) {
-    hide('world-history');
+  // ======== 進入輪迴 ========
+  async enterReincarnation() {
+    const stamina = Game.getStaminaDisplay();
+    if (!stamina.canRun) {
+      alert('體力不足或今日次數已用完！');
+      return;
+    }
+
+    // AI picks a world
+    const world = Game.pickWorldForPlayer();
+    if (!world) {
+      alert('沒有可進入的世界！');
+      return;
+    }
+
+    hide('dungeon-select');
     show('loading-area');
 
     const loadingEl = document.getElementById('loading-area');
     if (loadingEl) {
       loadingEl.innerHTML = `
         <div class="loading-spinner">🌀</div>
-        <div class="loading-text">AI 正在生成副本世界...</div>
-        <div class="loading-sub">根據你的屬性設計路線、敵人和掉落物品</div>
+        <div class="loading-text">AI 正在為你構建輪迴...</div>
+        <div class="loading-sub">根據你的數據、裝備和經歷建構獨一無二的冒險</div>
+        <div class="loading-world">🌍 ${world.tier}級 · ${world.name}</div>
       `;
     }
 
-    // Give UI time to render before blocking
+    // Let UI render before blocking
     await new Promise(r => setTimeout(r, 100));
 
-    const dungeon = await Game.startRun(worldId);
+    // Generate dungeon (this includes stamina spend)
+    const dungeon = await Game.startRun(world.id);
     if (!dungeon) {
-      loadingEl.innerHTML = `<div class="loading-text" style="color:var(--danger)">❌ 體力不足或發生錯誤</div>`;
-      setTimeout(() => this.renderWorldList(), 1500);
+      loadingEl.innerHTML = `<div class="loading-text" style="color:var(--danger)">❌ 輪迴失敗</div>`;
+      setTimeout(() => { hide('loading-area'); show('dungeon-select'); this.updateDisplay(); }, 1500);
       return;
     }
 
@@ -153,80 +122,71 @@ const GameUI = {
   },
 
   enterDungeon(dungeon) {
-    hide('dungeon-select');
     show('adventure-area');
-
+    const world = WORLDS.find(w => w.id === dungeon.worldId);
     setText('scene-dungeon-name', `${dungeon.worldTier}級 · ${dungeon.worldName}`);
     this.showBranch(dungeon.currentBranch);
   },
 
   resumeAdventure(dungeon) {
-    hide('dungeon-select');
     show('adventure-area');
-
     setText('scene-dungeon-name', `${dungeon.worldTier}級 · ${dungeon.worldName}（未完成）`);
     this.showBranch(dungeon.currentBranch);
   },
 
   // ======== 顯示分支 ========
-  showBranch(branchId) {
+  showBranch(branchInput) {
     if (!Game.currentDungeon) return;
 
-    // If we got a string, look up the branch
-    const branch = typeof branchId === 'string'
-      ? Game.currentDungeon.branches[branchId]
-      : branchId;
+    const branch = typeof branchInput === 'string'
+      ? Game.currentDungeon.branches[branchInput]
+      : branchInput;
 
     if (!branch) return;
 
     Game.currentBranch = branch;
     hide('scene-result');
-    hide('choices-container');
 
-    // Show narrative
+    // Narrative
     const narrativeEl = document.getElementById('scene-narrative');
     if (narrativeEl) {
       narrativeEl.innerHTML = `
         <div class="branch-title">${branch.title}</div>
-        <div class="narrative-text">${this._formatText(branch.description)}</div>
+        <div class="narrative-text">${this._fmt(branch.description)}</div>
       `;
     }
 
-    // Show choices if not end
-    if (!branch.isEnd && branch.choices?.length > 0) {
-      show('choices-container');
-      const choicesEl = document.getElementById('choices-container');
-      const keys = ['A', 'B', 'C'];
-
-      choicesEl.innerHTML = branch.choices.map((c, i) => {
-        const statTag = c.requires
-          ? `<span class="choice-stat">[${STAT_LABELS[c.requires.stat] || c.requires.stat} ${c.requires.dc}]</span>`
-          : `<span class="choice-stat safe">[安全]</span>`;
-
-        const statOk = !c.requires || (Game.player.stats[c.requires.stat] || 0) >= c.requires.dc;
-        const enc = c.encounter || {};
-        const diffTag = enc.difficulty !== 'none' && enc.difficulty
-          ? `<span class="choice-diff ${enc.difficulty}">${enc.difficulty === 'easy' ? '簡單' : enc.difficulty === 'medium' ? '中等' : '困難'}</span>`
-          : '';
-
-        return `
-          <button class="choice-btn ${statOk ? 'active' : 'locked'}" ${!statOk ? 'disabled' : ''}
-                  onclick="GameUI.makeChoice('${c.id}')">
-            <span class="choice-key">${keys[i] || (i+1)}</span>
-            ${statTag}
-            ${diffTag}
-            <span class="choice-text">${c.text}</span>
-          </button>
-        `;
-      }).join('');
-    }
-
-    // If end node, show ending
-    if (branch.isEnd) {
+    // Choices
+    const choicesEl = document.getElementById('choices-container');
+    if (branch.isEnd || !branch.choices?.length) {
+      hide('choices-container');
       this.showEnding();
+      return;
     }
 
-    this.updateHUD();
+    show('choices-container');
+    const keys = ['A', 'B', 'C'];
+    choicesEl.innerHTML = branch.choices.map((c, i) => {
+      const statTag = c.requires
+        ? `<span class="choice-stat">[${STAT_LABELS[c.requires.stat] || c.requires.stat} ${c.requires.dc}]</span>`
+        : `<span class="choice-stat safe">[安全]</span>`;
+
+      const statOk = !c.requires || (Game.player.stats[c.requires.stat] || 0) >= c.requires.dc;
+      const enc = c.encounter || {};
+
+      return `
+        <button class="choice-btn ${statOk ? 'active' : 'locked'}" ${!statOk ? 'disabled' : ''}
+                onclick="GameUI.makeChoice('${c.id}')">
+          <span class="choice-key">${keys[i] || (i+1)}</span>
+          ${statTag}
+          <span class="choice-text">${c.text}</span>
+        </button>
+      `;
+    }).join('');
+
+    // Set scene progress
+    setText('scene-progress', `分支 ${Game.currentDungeon.pathTaken.length + 1}`);
+    this.updateDisplay();
   },
 
   makeChoice(choiceId) {
@@ -238,18 +198,20 @@ const GameUI = {
 
     const { result: outcome, nextBranch, isEnd, choice } = result;
 
-    // Show encounter result
     const resultEl = document.getElementById('result-text');
     if (resultEl) {
-      const enc = choice.encounter || {};
       const outcomeDesc = outcome.success
-        ? this._randomSuccessText(enc.type)
-        : this._randomFailText(enc.type);
+        ? (choice.encounter?.type === 'story' ? '你選擇了這條路。' : '你的行動成功了！')
+        : '行動不太順利⋯⋯';
+
+      const statDetail = choice.requires
+        ? `<span class="roll-detail">🎲 d20 + ${Game.player.stats[choice.requires.stat] || 0} ≥ ${choice.requires.dc}</span>`
+        : '';
 
       resultEl.innerHTML = `
         <div class="encounter-result ${outcome.success ? 'success' : 'fail'}">
           ${outcome.success ? '✅ 成功' : '❌ 失敗'}
-          ${choice.requires ? `<span class="roll-detail">🎲 骰子判定</span>` : ''}
+          ${statDetail}
         </div>
         <div class="outcome-text">${outcomeDesc}</div>
         <div class="xp-gain">✨ +${outcome.xpGained} EXP</div>
@@ -266,20 +228,16 @@ const GameUI = {
             </div>
           </div>
         ` : ''}
+        ${Game.player.statPoints > 0 ? `<div class="level-up-notice">⬆️ 升級！獲得 <strong>${Game.player.statPoints}</strong> 屬性點，去大廳分配吧！</div>` : ''}
       `;
     }
 
-    // Update continue button
     const continueBtn = document.getElementById('continue-btn');
     if (continueBtn) {
-      if (isEnd) {
-        continueBtn.textContent = '✦ 查看結局';
-      } else {
-        continueBtn.textContent = '➤ 繼續冒險';
-      }
+      continueBtn.textContent = isEnd ? '✦ 查看結局' : '➤ 繼續輪迴';
     }
 
-    this.updateHUD();
+    this.updateDisplay();
   },
 
   nextScene() {
@@ -287,18 +245,17 @@ const GameUI = {
 
     if (Game.currentBranch.isEnd) {
       this.finishRun();
+      return;
+    }
+
+    hide('scene-result');
+    const nextId = Game.currentDungeon.currentBranch;
+    const nextBranch = Game.currentDungeon.branches[nextId];
+
+    if (nextBranch) {
+      this.showBranch(nextBranch);
     } else {
-      hide('scene-result');
-
-      // Navigate to the next branch
-      const lastChoiceId = Game.currentDungeon.pathTaken[Game.currentDungeon.pathTaken.length - 1];
-      const currentBranch = Game.currentDungeon.branches[Game.currentDungeon.currentBranch];
-
-      if (currentBranch) {
-        this.showBranch(currentBranch);
-      } else {
-        this.finishRun();
-      }
+      this.finishRun();
     }
   },
 
@@ -311,33 +268,30 @@ const GameUI = {
       ? Game.currentDungeon.endings.find(e => e.type === dungeon.finalEnding)
       : null;
 
+    const colors = { TE: 'var(--gold)', HE: 'var(--secondary)', BE: 'var(--danger)' };
+    const icons = { TE: '✦', HE: '✅', BE: '💀' };
+    const bgs = {
+      TE: 'linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,152,0,0.1))',
+      HE: 'linear-gradient(135deg, rgba(0,184,148,0.1), rgba(85,239,196,0.1))',
+      BE: 'linear-gradient(135deg, rgba(255,107,107,0.1), rgba(225,112,85,0.1))'
+    };
+
     const resultEl = document.getElementById('result-text');
     if (resultEl) {
-      const endingColors = { TE: 'var(--gold)', HE: 'var(--secondary)', BE: 'var(--danger)' };
-      const endingBg = {
-        TE: 'linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,152,0,0.1))',
-        HE: 'linear-gradient(135deg, rgba(0,184,148,0.1), rgba(85,239,196,0.1))',
-        BE: 'linear-gradient(135deg, rgba(255,107,107,0.1), rgba(225,112,85,0.1))'
-      };
-      const endingIcons = { TE: '✦', HE: '✅', BE: '💀' };
-
       resultEl.innerHTML = `
-        <div class="ending-display" style="border-color:${endingColors[ending?.type] || '#999'};background:${endingBg[ending?.type] || 'white'}">
-          <div class="ending-icon" style="color:${endingColors[ending?.type] || '#999'}">
-            ${endingIcons[ending?.type] || '?'}
-          </div>
-          <div class="ending-label" style="color:${endingColors[ending?.type] || '#999'}">
-            ${ending?.label || '冒險結束'}
-          </div>
+        <div class="ending-display" style="border-color:${colors[ending?.type] || '#999'};background:${bgs[ending?.type] || 'white'}">
+          <div class="ending-icon" style="color:${colors[ending?.type] || '#999'}">${icons[ending?.type] || '?'}</div>
+          <div class="ending-label" style="color:${colors[ending?.type] || '#999'}">${ending?.label || '輪迴結束'}</div>
           <div class="ending-condition">${ending?.condition || ''}</div>
           <div class="ending-xp">✨ +${ending?.xpBonus || 0} EXP（結局獎勵）</div>
+          ${Game.player.statPoints > 0 ? `<div class="upgrade-notice">⬆️ 獲得屬性點！</div>` : ''}
         </div>
       `;
     }
 
     const continueBtn = document.getElementById('continue-btn');
     if (continueBtn) {
-      continueBtn.textContent = '✦ 返回大廳';
+      continueBtn.textContent = '✦ 回到大廳';
     }
   },
 
@@ -345,42 +299,17 @@ const GameUI = {
     Storage.clearDungeon();
     Game.currentDungeon = null;
     Game.currentBranch = null;
-    this.renderWorldList();
-    this.updateHUD();
+    hide('adventure-area');
+    show('dungeon-select');
+    this.updateDisplay();
   },
 
-  // ======== 文字 helper ========
-  _formatText(text) {
+  _fmt(text) {
     return (text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
-  },
-
-  _randomSuccessText(type) {
-    const texts = {
-      exploration: ['你仔細觀察，發現了隱藏的線索！這條路是正確的。', '你的洞察力讓你避開了危險，找到了前進的方向。'],
-      puzzle: ['你成功解開了謎題！機關發出咔嚓聲，前方的大門打開了。', '你的推理能力讓一切變得清晰。'],
-      combat: ['你展現了出色的戰鬥技巧！成功擊退了威脅。', '雖然戰鬥激烈，但你成功脫身了。'],
-      gambling: ['你的直覺是對的！這次冒險獲得了回報。', '運氣站在你這邊！'],
-      story: ['你的選擇帶來了意想不到的收穫。'],
-    };
-    const pool = texts[type] || texts.story;
-    return pool[Math.floor(Math.random() * pool.length)];
-  },
-
-  _randomFailText(type) {
-    const texts = {
-      exploration: ['周圍的環境太過隱晦。你錯過了關鍵的線索。', '你什麼也沒發現。'],
-      puzzle: ['這個謎題超出了你的理解範圍。', '你的推理走進了死胡同。'],
-      combat: ['你的攻擊被化解了！你被迫後退。', '戰鬥對你來說太過艱難。'],
-      gambling: ['這次運氣不好。冒險的行動帶來了一些麻煩。', '運氣不是永遠可靠的。'],
-      story: ['這個選擇沒有帶來預期的效果。'],
-    };
-    const pool = texts[type] || texts.story;
-    return pool[Math.floor(Math.random() * pool.length)];
   }
 };
 
-// ======== Init ========
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => GameUI.init());
 } else {

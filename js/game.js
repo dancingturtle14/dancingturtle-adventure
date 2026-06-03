@@ -638,7 +638,11 @@ const Game = {
     if (result.success) {
       this.player.exp += result.xpGained;
       const newLevel = calcLevel(this.player.exp);
-      if (newLevel > this.player.level) this.player.level = newLevel;
+      if (newLevel > this.player.level) {
+        const gained = newLevel - this.player.level;
+        this.player.statPoints += gained * 3;
+        this.player.level = newLevel;
+      }
 
       // 物品掉落
       if (result.item) {
@@ -653,7 +657,11 @@ const Game = {
         this.currentDungeon.finalEnding = ending.type;
         this.player.exp += ending.xpBonus;
         const newLevel = calcLevel(this.player.exp);
-        if (newLevel > this.player.level) this.player.level = newLevel;
+        if (newLevel > this.player.level) {
+          const gained = newLevel - this.player.level;
+          this.player.statPoints += gained * 3;
+          this.player.level = newLevel;
+        }
 
         if (ending.type === 'TE') this.player.teCount++;
         else if (ending.type === 'HE') this.player.heCount++;
@@ -765,5 +773,40 @@ const Game = {
     this.player.items.splice(idx, 1);
     this.save();
     return { price, itemName: item.name };
+  },
+
+  // AI picks a world for the player based on level
+  pickWorldForPlayer() {
+    const available = WORLDS.filter(w => this.player.level >= w.minLevel);
+    if (available.length === 0) return null;
+
+    // Weight: lower tier worlds are more common for appropriate-level players
+    const tierOrder = { F: 0, E: 1, D: 2, C: 3, B: 4, A: 5 };
+    const weight = available.map(w => {
+      const tier = tierOrder[w.tier] || 0;
+      const playerTier = Math.floor(this.player.level / 3);
+      const diff = Math.abs(tier - playerTier);
+      return Math.max(1, 10 - diff * 2); // closer to player level = higher weight
+    });
+
+    const totalWeight = weight.reduce((a, b) => a + b, 0);
+    let roll = Math.random() * totalWeight;
+    for (let i = 0; i < available.length; i++) {
+      roll -= weight[i];
+      if (roll <= 0) return available[i];
+    }
+    return available[available.length - 1];
+  },
+
+  // Spend stat points to upgrade an attribute
+  spendStatPoint(statName) {
+    if (this.player.statPoints <= 0) return false;
+    if (!this.player.stats[statName]) return false;
+    if (this.player.stats[statName] >= 20) return false; // cap at 20
+
+    this.player.stats[statName]++;
+    this.player.statPoints--;
+    this.save();
+    return true;
   },
 };

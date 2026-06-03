@@ -52,6 +52,58 @@ const LobbyUI = {
 
     setText('daily-left', p.dailyRunsLeft);
     setText('item-count', p.items.length);
+
+    // Stat points section
+    const spEl = document.getElementById('statpoints-section');
+    if (spEl) {
+      if (p.statPoints > 0) {
+        spEl.style.display = 'block';
+        setText('sp-available', p.statPoints);
+        this.renderStatUpgrades();
+      } else {
+        spEl.style.display = 'none';
+      }
+    }
+  },
+
+  renderStatUpgrades() {
+    const container = document.getElementById('stat-upgrade-list');
+    if (!container) return;
+
+    const p = Game.player;
+    const stats = [
+      { key: 'insight', label: '洞察力', icon: '🔍', desc: '發現線索、觀察細節' },
+      { key: 'survival', label: '生存力', icon: '🛡️', desc: '迴避危險、承受傷害' },
+      { key: 'combat', label: '戰鬥力', icon: '⚔️', desc: '直接對抗、武力解決' },
+      { key: 'puzzle', label: '解謎力', icon: '🧩', desc: '破解機關、理解規則' },
+      { key: 'luck', label: '運氣', icon: '🍀', desc: '隨機事件、意外發現' },
+    ];
+
+    container.innerHTML = stats.map(s => {
+      const val = p.stats[s.key] || 0;
+      const maxed = val >= 20;
+      return `
+        <div class="sp-row">
+          <div class="sp-info">
+            <span class="sp-icon">${s.icon}</span>
+            <div>
+              <div class="sp-label">${s.label} <span class="sp-val">${val}</span>${maxed ? '<span class="sp-maxed">MAX</span>' : ''}</div>
+              <div class="sp-desc">${s.desc}</div>
+            </div>
+          </div>
+          <button class="sp-btn ${maxed || p.statPoints <= 0 ? 'disabled' : ''}"
+                  onclick="LobbyUI.upgradeStat('${s.key}')"
+                  ${maxed || p.statPoints <= 0 ? 'disabled' : ''}>+</button>
+        </div>
+      `;
+    }).join('');
+  },
+
+  upgradeStat(statKey) {
+    const result = Game.spendStatPoint(statKey);
+    if (result) {
+      this.updateAll();
+    }
   },
 
   setupChat() {
