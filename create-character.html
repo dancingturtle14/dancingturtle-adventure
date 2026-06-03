@@ -121,11 +121,12 @@
       <!-- 開始遊戲 -->
       <div style="display:flex;gap:12px;margin-top:24px">
         <button class="btn btn-secondary" style="flex:1" onclick="history.back()">← 返回</button>
-        <button class="btn btn-primary" style="flex:2" onclick="location.href='lobby.html'">✦ 進入無限流世界</button>
+        <button class="btn btn-primary" style="flex:2" onclick="saveAndEnter()">✦ 進入無限流世界</button>
       </div>
     </div>
   </div>
 
+  <script src="js/data.js"></script>
   <script>
     let points = 20;
     const stats = { insight: 5, survival: 5, combat: 5, puzzle: 5, luck: 5 };
@@ -175,6 +176,35 @@
     });
 
     renderStats();
+
+    function saveAndEnter() {
+      // Get character name
+      const nameInput = document.querySelector('.form-group:first-child input');
+      const charName = nameInput?.value?.trim() || '夜鴞';
+
+      // Get selected avatar
+      const selectedAvatar = document.querySelector('.avatar-option.selected');
+      const avatar = selectedAvatar?.textContent || '🦉';
+
+      // Save player to localStorage
+      const player = createDefaultPlayer(charName, avatar);
+      player.stats = { ...stats };
+      player.level = 1;
+      player.exp = 0;
+      player.currency = 0;
+      player.stamina = MAX_STAMINA;
+      player.dailyRunsLeft = FREE_RUNS_PER_DAY;
+      player.lastDailyReset = new Date().toISOString().split('T')[0];
+      player.completedRuns = 0;
+      player.items = [];
+
+      // Clear old save
+      localStorage.removeItem('wuxianliu_save');
+      Storage.save(player);
+
+      // Navigate
+      location.href = 'lobby.html';
+    }
   </script>
 </body>
 </html>
