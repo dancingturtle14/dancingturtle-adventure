@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>無限流模擬器 — 大廳</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game-components.css">
+</head>
+<body>
+  <div class="game-layout">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <a href="lobby.html" class="top-bar-logo" style="text-decoration:none">🌀 無限流模擬器</a>
+        <div class="top-bar-tabs">
+          <a href="lobby.html" class="tab-btn active">🏠 大廳</a>
+          <a href="game.html" class="tab-btn">⚔️ 冒險</a>
+          <a href="inventory.html" class="tab-btn">🎒 背包</a>
+          <a href="shop.html" class="tab-btn">🏪 商店</a>
+          <a href="trade.html" class="tab-btn">🔄 交易</a>
+          <a href="ranking.html" class="tab-btn">🏆 排行</a>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <span class="status-badge">⚡ <span id="stamina-val">100</span>/100</span>
+        <span class="status-badge">🎫 <span id="daily-val">5</span>次</span>
+        <span class="status-badge">💰 <span id="currency-val">0</span></span>
+        <div class="avatar-mini" id="avatar-display">🦉</div>
+        <button class="settings-btn" onclick="SettingsUI.open()" title="設定">⚙️</button>
+      </div>
+    </div>
+
+    <div class="mobile-player-bar">
+      <div class="mobile-avatar" id="mobile-avatar">🦉</div>
+      <div class="mobile-info">
+        <div class="name" id="mobile-name">夜鴞 · Lv.<span id="mobile-level">1</span></div>
+        <div style="font-size:11px;color:var(--text-light)">✨ EXP: <span id="mobile-exp">0</span></div>
+      </div>
+    </div>
+
+    <div class="game-content">
+      <div class="lobby-layout">
+        <!-- Left: Player Card -->
+        <div class="lobby-left">
+          <div class="lobby-player-card">
+            <div class="lobby-avatar" id="lobby-avatar">🦉</div>
+            <div class="lobby-player-name" id="lobby-name">夜鴞</div>
+            <div class="lobby-player-title" id="lobby-title">初曙探索者</div>
+            <div class="lobby-level">Lv.<span id="lobby-level">1</span></div>
+
+            <div class="lobby-stats-grid">
+              <div class="lobby-stat"><span class="stat-icon">🔍</span>洞察 <span id="stat-insight">5</span></div>
+              <div class="lobby-stat"><span class="stat-icon">🛡️</span>生存 <span id="stat-survival">5</span></div>
+              <div class="lobby-stat"><span class="stat-icon">⚔️</span>戰鬥 <span id="stat-combat">5</span></div>
+              <div class="lobby-stat"><span class="stat-icon">🧩</span>解謎 <span id="stat-puzzle">5</span></div>
+              <div class="lobby-stat"><span class="stat-icon">🍀</span>運氣 <span id="stat-luck">5</span></div>
+            </div>
+
+            <div class="lobby-run-stats">
+              <div class="run-stat"><span class="num" id="run-total">0</span> 通關</div>
+              <div class="run-stat"><span class="num te" id="run-te">0</span> TE</div>
+              <div class="run-stat"><span class="num be" id="run-be">0</span> BE</div>
+            </div>
+
+            <div class="lobby-stamina-bar">
+              <div class="stm-label">⚡ 體力 <span id="stm-val">100</span>/<span id="stm-max">100</span></div>
+              <div class="stm-bg"><div class="stm-fill" id="stm-fill" style="width:100%"></div></div>
+              <div class="stm-daily">今日免費次數：<span id="daily-left">5</span></div>
+            </div>
+          </div>
+
+          <div class="lobby-quick-actions">
+            <a href="game.html" class="quick-action-btn primary">⚔️ 開始冒險</a>
+            <a href="inventory.html" class="quick-action-btn">🎒 背包 (<span id="item-count">0</span>)</a>
+            <a href="shop.html" class="quick-action-btn">🏪 商店</a>
+          </div>
+        </div>
+
+        <!-- Right: Chat -->
+        <div class="lobby-right">
+          <div class="lobby-chat">
+            <div class="chat-header">
+              💬 世界頻道
+              <span class="online-count" id="online-count">👤 線上: 1</span>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+              <div class="chat-msg system">🌟 歡迎來到無限流模擬器！在這裡你可以探索無數個副本世界。</div>
+              <div class="chat-msg system">💡 每日有 5 次免費冒險，或使用體力繼續挑戰。</div>
+              <div class="chat-msg system">🔄 不需要的物品可以賣給商店換取資金，再用資金與其他玩家交易。</div>
+            </div>
+            <div class="chat-input-bar">
+              <input type="text" class="chat-input" id="chat-input" placeholder="輸入訊息..." maxlength="200">
+              <button class="chat-send-btn" onclick="LobbyUI.sendChat()">➤</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <a href="lobby.html" class="nav-item active">🏠<br>大廳</a>
+      <a href="game.html" class="nav-item">⚔️<br>冒險</a>
+      <a href="inventory.html" class="nav-item">🎒<br>背包</a>
+      <a href="shop.html" class="nav-item">🏪<br>商店</a>
+      <a href="ranking.html" class="nav-item">🏆<br>排行</a>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ai-gm.js"></script>
+  <script src="js/ui-settings.js"></script>
+  <script src="js/ui-lobby.js"></script>
+</body>
+</html>

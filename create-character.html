@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>無限流模擬器 - 創建角色</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game-components.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <div class="char-create-panel">
+      <div style="text-align:center;margin-bottom:8px">
+        <span style="font-size:48px">🌀</span>
+      </div>
+      <h2>✦ 創建你的角色 ✦</h2>
+      <p style="text-align:center;color:var(--text-light);font-size:14px;margin-bottom:24px">
+        你將以這個身份進入無限流世界
+      </p>
+
+      <!-- 角色名稱 -->
+      <div class="form-group">
+        <label>角色稱號（遊戲名稱）</label>
+        <input type="text" class="form-input" placeholder="輸入你的稱號..." value="夜鴞">
+      </div>
+
+      <!-- 頭像選擇 -->
+      <div class="form-group">
+        <label>選擇頭像</label>
+        <div class="avatar-grid">
+          <div class="avatar-option selected">🦉</div>
+          <div class="avatar-option">🐉</div>
+          <div class="avatar-option">🦊</div>
+          <div class="avatar-option">🌙</div>
+          <div class="avatar-option">🌹</div>
+          <div class="avatar-option">⭐</div>
+          <div class="avatar-option">🥷</div>
+          <div class="avatar-option">🌌</div>
+          <div class="avatar-option">⚡</div>
+          <div class="avatar-option">🔥</div>
+          <div class="avatar-option">🌊</div>
+          <div class="avatar-option">🪨</div>
+        </div>
+      </div>
+
+      <!-- 屬性分配 -->
+      <div class="form-group">
+        <label>屬性分配</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-size:13px;color:var(--text-light)">剩餘點數：</span>
+          <span id="stat-points" style="font-size:24px;font-weight:900;color:var(--primary)">20</span>
+        </div>
+
+        <div class="stat-distribute">
+          <label>🔍 洞察力 — 發現線索、觀察細節</label>
+          <div class="stat-controls">
+            <button class="stat-minus" data-stat="insight">−</button>
+            <span class="stat-num" id="stat-insight">5</span>
+            <button class="stat-plus" data-stat="insight">+</button>
+          </div>
+        </div>
+        <div class="stat-distribute">
+          <label>🛡️ 生存力 — 迴避危險、承受傷害</label>
+          <div class="stat-controls">
+            <button class="stat-minus" data-stat="survival">−</button>
+            <span class="stat-num" id="stat-survival">5</span>
+            <button class="stat-plus" data-stat="survival">+</button>
+          </div>
+        </div>
+        <div class="stat-distribute">
+          <label>⚔️ 戰鬥力 — 直接對抗、武力解決</label>
+          <div class="stat-controls">
+            <button class="stat-minus" data-stat="combat">−</button>
+            <span class="stat-num" id="stat-combat">5</span>
+            <button class="stat-plus" data-stat="combat">+</button>
+          </div>
+        </div>
+        <div class="stat-distribute">
+          <label>🧩 解謎力 — 破解機關、理解規則</label>
+          <div class="stat-controls">
+            <button class="stat-minus" data-stat="puzzle">−</button>
+            <span class="stat-num" id="stat-puzzle">5</span>
+            <button class="stat-plus" data-stat="puzzle">+</button>
+          </div>
+        </div>
+        <div class="stat-distribute">
+          <label>🍀 幸運值 — 隨機事件、意外發現</label>
+          <div class="stat-controls">
+            <button class="stat-minus" data-stat="luck">−</button>
+            <span class="stat-num" id="stat-luck">5</span>
+            <button class="stat-plus" data-stat="luck">+</button>
+          </div>
+        </div>
+
+        <!-- Preset builds -->
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="applyPreset({insight:8,survival:3,combat:4,puzzle:8,luck:2})">
+            🔍 偵探型
+          </button>
+          <button class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="applyPreset({insight:3,survival:7,combat:8,puzzle:2,luck:5})">
+            ⚔️ 戰士型
+          </button>
+          <button class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="applyPreset({insight:2,survival:8,combat:3,puzzle:2,luck:10})">
+            🍀 幸運型
+          </button>
+          <button class="btn btn-secondary" style="flex:1;font-size:12px;padding:8px" onclick="applyPreset({insight:5,survival:5,combat:5,puzzle:5,luck:5})">
+            ⚖️ 均衡型
+          </button>
+        </div>
+      </div>
+
+      <!-- 背景故事 -->
+      <div class="form-group">
+        <label>背景故事（可選）</label>
+        <textarea class="form-input" rows="3" placeholder="輸入你角色的背景故事... 或者留空等 AI 幫你生成" style="resize:vertical;font-family:inherit"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button class="btn btn-ghost" style="font-size:12px" onclick="alert('🎭 AI 正在為你生成背景故事...\n\n（AI 集成開發中）')">🎭 AI 幫我生成</button>
+        </div>
+      </div>
+
+      <!-- 開始遊戲 -->
+      <div style="display:flex;gap:12px;margin-top:24px">
+        <button class="btn btn-secondary" style="flex:1" onclick="history.back()">← 返回</button>
+        <button class="btn btn-primary" style="flex:2" onclick="location.href='lobby.html'">✦ 進入無限流世界</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let points = 20;
+    const stats = { insight: 5, survival: 5, combat: 5, puzzle: 5, luck: 5 };
+    const maxPerStat = 15;
+
+    function renderStats() {
+      document.getElementById('stat-points').textContent = points;
+      Object.entries(stats).forEach(([key, val]) => {
+        const el = document.getElementById(`stat-${key}`);
+        if (el) el.textContent = val;
+      });
+    }
+
+    function adjust(stat, delta) {
+      if (delta > 0 && points <= 0) return;
+      if (delta < 0 && stats[stat] <= 1) return;
+      if (delta > 0 && stats[stat] >= maxPerStat) return;
+      
+      stats[stat] += delta;
+      points -= delta;
+      renderStats();
+    }
+
+    function applyPreset(preset) {
+      const totalPreset = Object.values(preset).reduce((a, b) => a + b, 0);
+      const totalCurrent = Object.values(stats).reduce((a, b) => a + b, 0);
+      points = totalCurrent - totalPreset; // Adjust points
+      if (points < 0) return; // Not enough points
+      
+      Object.assign(stats, preset);
+      renderStats();
+    }
+
+    document.querySelectorAll('.stat-minus').forEach(btn => {
+      btn.addEventListener('click', () => adjust(btn.dataset.stat, -1));
+    });
+    document.querySelectorAll('.stat-plus').forEach(btn => {
+      btn.addEventListener('click', () => adjust(btn.dataset.stat, 1));
+    });
+
+    // Avatar selection
+    document.querySelectorAll('.avatar-option').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+
+    renderStats();
+  </script>
+</body>
+</html>

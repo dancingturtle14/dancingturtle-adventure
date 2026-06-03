@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>無限流模擬器 — 冒險</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game-components.css">
+</head>
+<body>
+  <div class="game-layout">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <a href="lobby.html" class="top-bar-logo" style="text-decoration:none">🌀 無限流模擬器</a>
+        <div class="top-bar-tabs">
+          <a href="lobby.html" class="tab-btn">🏠 大廳</a>
+          <a href="game.html" class="tab-btn active">⚔️ 冒險</a>
+          <a href="inventory.html" class="tab-btn">🎒 背包</a>
+          <a href="shop.html" class="tab-btn">🏪 商店</a>
+          <a href="ranking.html" class="tab-btn">🏆 排行</a>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <span class="status-badge" id="stamina-display">
+          ⚡ <span id="stamina-val">100</span>/100
+        </span>
+        <span class="status-badge" id="daily-display">
+          🎫 <span id="daily-val">5</span>次
+        </span>
+        <span class="status-badge">
+          💰 <span id="currency-val">0</span>
+        </span>
+        <div class="avatar-mini" id="avatar-display">🦉</div>
+      </div>
+    </div>
+
+    <!-- Mobile Top -->
+    <div class="mobile-player-bar">
+      <div class="mobile-avatar" id="mobile-avatar">🦉</div>
+      <div class="mobile-info">
+        <div class="name" id="mobile-name">夜鴞 · Lv.<span id="mobile-level">1</span></div>
+        <div style="font-size:11px;color:var(--text-light)" id="mobile-exp">EXP: 0</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-light)">⚡<span id="mobile-stamina">100</span></div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="game-content">
+      <!-- Dungeon Select (shown when not in a run) -->
+      <div id="dungeon-select" class="dungeon-select-panel">
+        <div class="dungeon-header-section">
+          <h1>⚔️ 選擇副本</h1>
+          <p style="color:var(--text-light);font-size:14px;margin-top:4px">
+            每次冒險消耗 <strong>20</strong> 體力 ｜ 每日免費 <strong>5</strong> 次
+          </p>
+        </div>
+
+        <div id="dungeon-list" class="dungeon-grid">
+          <!-- Dungeons rendered by JS -->
+        </div>
+
+        <div class="run-summary" id="run-summary" style="display:none">
+          <h3>📋 上次冒險回顧</h3>
+          <div id="last-run-detail"></div>
+        </div>
+      </div>
+
+      <!-- Adventure Area (shown during a run) -->
+      <div id="adventure-area" class="adventure-panel" style="display:none">
+        <!-- Scene Narrative -->
+        <div class="scene-header">
+          <span id="scene-dungeon-name">副本名稱</span>
+          <span class="scene-progress" id="scene-progress">場景 1/3</span>
+        </div>
+
+        <div class="scene-narrative" id="scene-narrative">
+          <!-- Narrative text rendered by JS -->
+        </div>
+
+        <!-- Choices A/B/C/D -->
+        <div class="choices-container" id="choices-container">
+          <!-- Choice buttons rendered by JS -->
+        </div>
+
+        <!-- Result (shown after choice, before next) -->
+        <div class="scene-result" id="scene-result" style="display:none">
+          <div class="result-text" id="result-text"></div>
+
+          <!-- Item drop notification -->
+          <div id="item-drop-display" style="display:none" class="item-drop-card"></div>
+
+          <!-- Ending card -->
+          <div id="ending-card" style="display:none" class="ending-card"></div>
+
+          <button class="btn btn-primary" id="continue-btn" onclick="GameUI.nextScene()" style="margin-top:16px">
+            ➤ 繼續
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+      <a href="lobby.html" class="nav-item">🏠<br>大廳</a>
+      <a href="game.html" class="nav-item active">⚔️<br>冒險</a>
+      <a href="inventory.html" class="nav-item">🎒<br>背包</a>
+      <a href="shop.html" class="nav-item">🏪<br>商店</a>
+      <a href="ranking.html" class="nav-item">🏆<br>排行</a>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ai-gm.js"></script>
+  <script src="js/ui-game.js"></script>
+</body>
+</html>

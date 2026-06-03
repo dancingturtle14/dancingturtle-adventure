@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DancingTurtle 無限流模擬器</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/game-components.css">
+</head>
+<body>
+  <div class="landing">
+    <div class="landing-card">
+      <div class="landing-logo">
+        <span class="icon">🌀</span>
+        <h1>無限流模擬器</h1>
+        <p>DancingTurtle 文字冒險 · AI 驅動</p>
+      </div>
+
+      <!-- Login Form -->
+      <div id="login-form">
+        <div class="form-group">
+          <label>帳號</label>
+          <input type="text" class="form-input" placeholder="輸入帳號名稱">
+        </div>
+        <div class="form-group">
+          <label>密碼</label>
+          <input type="password" class="form-input" placeholder="輸入密碼">
+        </div>
+        <button class="btn btn-primary" onclick="location.href='lobby.html'">✦ 進入無限流世界</button>
+        <div class="form-footer">
+          <span>未有帳號？<a href="#" onclick="toggleAuth('register')">立即註冊</a></span>
+        </div>
+      </div>
+
+      <!-- Register Form (hidden) -->
+      <div id="register-form" style="display:none">
+        <div class="form-group">
+          <label>選擇頭像</label>
+          <div class="avatar-grid">
+            <div class="avatar-option selected">🦉</div>
+            <div class="avatar-option">🐉</div>
+            <div class="avatar-option">🦊</div>
+            <div class="avatar-option">🌙</div>
+            <div class="avatar-option">🌹</div>
+            <div class="avatar-option">⭐</div>
+            <div class="avatar-option">🥷</div>
+            <div class="avatar-option">🌌</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>玩家名稱</label>
+          <input type="text" class="form-input" placeholder="取一個霸氣嘅名字" value="夜鴞">
+        </div>
+        <div class="form-group">
+          <label>電郵</label>
+          <input type="email" class="form-input" placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>密碼</label>
+          <input type="password" class="form-input" placeholder="設定密碼">
+        </div>
+        <button class="btn btn-primary" onclick="location.href='create-character.html'">✦ 註冊並創建角色</button>
+        <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:12px">
+          ⚡ 每日 5 次免費冒險 · 體力每 10 分鐘回復 · 物品可賣商店
+        </p>
+        <div class="form-footer">
+          <span>已有帳號？<a href="#" onclick="toggleAuth('login')">返回登入</a></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleAuth(mode) {
+      document.getElementById('login-form').style.display = mode === 'login' ? 'block' : 'none';
+      document.getElementById('register-form').style.display = mode === 'register' ? 'block' : 'none';
+    }
+    // Avatar selection
+    document.querySelectorAll('.avatar-option').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    });
+  </script>
+</body>
+</html>
