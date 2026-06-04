@@ -372,7 +372,7 @@ const Game = {
       const isEndingBySceneType = sceneResult.nextScene?.scene_type === 'ending' ||
         (sceneResult.nextScene?.ending_proximity >= 85 && this.currentRun.sceneCount >= 7);
 
-      if (sceneResult.isEnding || this.currentRun.sceneCount >= 15 || isEndingBySceneType) {
+      if (sceneResult.isEnding || this.currentRun.sceneCount >= 30 || isEndingBySceneType) {
         // Ending 場景
         if (isEndingBySceneType && !sceneResult.isEnding) {
           // 由 scene_type/proximity 觸發：用 AI 生成嘅 nextScene 做結局
@@ -447,7 +447,7 @@ const Game = {
     }
   },
 
-  // ── 強制結束（第 15 輪硬 cap）──
+  // ── 強制結束（第 30 輪硬 cap）──
   async forceEnding() {
     if (!this.currentRun) return null;
     this.isAIGenerating = true;
