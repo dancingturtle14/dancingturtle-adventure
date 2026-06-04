@@ -172,12 +172,8 @@
     }
 
     function applyPreset(preset) {
-      const totalPreset = Object.values(preset).reduce((a, b) => a + b, 0);
-      const totalCurrent = Object.values(stats).reduce((a, b) => a + b, 0);
-      points = totalCurrent - totalPreset; // Adjust points
-      if (points < 0) return; // Not enough points
-      
       Object.assign(stats, preset);
+      points = 20;
       renderStats();
     }
 
@@ -197,6 +193,15 @@
     });
 
     renderStats();
+
+    // Pre-fill name from URL param (passed from registration)
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const regName = urlParams.get('name');
+      if (regName) {
+        const nameInput = document.querySelector('.form-group:first-child input');
+        if (nameInput) nameInput.value = regName;
+      }})();
 
     function saveAndEnter() {
       if (!_supaReady) { alert('系統加載中，請稍候...'); return; }

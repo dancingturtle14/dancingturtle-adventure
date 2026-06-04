@@ -154,7 +154,7 @@
           }
         }
 
-        window.location.href = 'create-character.html';
+        window.location.href = 'create-character.html?name=' + encodeURIComponent(name);
       } catch(e) {
         errEl.textContent = '註冊失敗：' + e.message;
         errEl.style.display = 'block';
