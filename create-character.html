@@ -192,16 +192,22 @@
       });
     });
 
-    renderStats();
+    // Fetch player name from Supabase server
+    (async function() {
+      const session = await SUPABASE.auth.getSession();
+      if (session?.data?.session) {
+        const { data } = await SUPABASE.from('players')
+          .select('username')
+          .eq('auth_id', session.data.session.user.id)
+          .single();
+        if (data?.username) {
+          const nameInput = document.querySelector('.form-group:first-child input');
+          if (nameInput) nameInput.value = data.username;
+        }
+      }
+    })();
 
-    // Pre-fill name from URL param (passed from registration)
-    (function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const regName = urlParams.get('name');
-      if (regName) {
-        const nameInput = document.querySelector('.form-group:first-child input');
-        if (nameInput) nameInput.value = regName;
-      }})();
+    renderStats();
 
     function saveAndEnter() {
       if (!_supaReady) { alert('系統加載中，請稍候...'); return; }
